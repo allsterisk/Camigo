@@ -3,6 +3,7 @@ package com.camigo.config;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.interceptor.RoleAuthorizationInterceptor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -35,5 +36,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(roleAuthorizationInterceptor)
                 .addPathPatterns("/api/**")
                 .order(1);
+    }
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("Authorization", "Content-Type")
+                .exposedHeaders("Authorization")
+                .allowCredentials(false)
+                .maxAge(3600);
     }
 }

@@ -52,6 +52,16 @@ mvn spring-boot:run
 - Swagger UI：`http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON：`http://localhost:8080/v3/api-docs`
 
+## Vue3 前端联调
+
+前端项目位于 `D:\IDEA projects\camigo-web`，默认从 `http://localhost:8080/api` 调用本服务。后端允许 `http://localhost:5173` 和 `http://127.0.0.1:5173` 的 Vite 开发请求，并支持 `Authorization` Header。
+
+```shell
+cd "D:\IDEA projects\camigo-web"
+npm install
+npm run dev
+```
+
 ## 已实现接口
 
 | 模块 | 方法与路径 | 功能 |

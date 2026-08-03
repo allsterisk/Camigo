@@ -3,7 +3,7 @@
 > 阶段：Phase 5 / Step 1 后端接口设计确认  
 > 版本：v1.0-draft  
 > 日期：2026-08-03  
-> 状态：设计已确认；Step 2～Step 4 后端业务模块 API 已实施
+> 状态：Phase 5 Step 1～Step 5 已完成，Vue3/Axios 联调基础设施已实施
 
 ## 1. 目标与范围
 
@@ -348,6 +348,8 @@ Step 4 已实现以下业务约束：
 - Headers：`Authorization`、`Content-Type`
 - Credentials：当前 JWT 使用 Header，不依赖 Cookie，默认关闭
 
+Step 5 已在独立项目 `D:\IDEA projects\camigo-web` 完成 Vue3、Vite、Element Plus、Axios、Vue Router 与 Pinia 初始化。Axios 统一解包 `Result<T>`，自动携带 JWT，并按 400/401/403/404/409/500 处理错误；401 会清理本地会话并跳转登录页。后端 CORS 已开放 `localhost:5173` 与 `127.0.0.1:5173`，且通过真实 OPTIONS 预检集成测试。
+
 Axios 请求拦截器从 Pinia 持久化状态读取 Token 并添加 Bearer Header。响应拦截器按 HTTP 状态处理：401 清理登录状态并跳转登录页，403 展示权限不足，400/404/409 展示后端 `message`，500 展示统一系统错误。
 
 ## 13. 现状差异与实施清单
@@ -394,4 +396,4 @@ Axios 请求拦截器从 Pinia 持久化状态读取 Token 并添加 Bearer Head
 - [x] Step 2：统一响应码、用户注册/登录/信息/修改接口、USER 角色迁移
 - [x] Step 3：快递模块 API、角色授权、目标快递柜关联与完成确认
 - [x] Step 4：配送模块 API、任务分页、公共状态映射、容量与并发接单控制
-- [ ] Step 5：Vue3 Axios 联调
+- [x] Step 5：Vue3 Axios、Pinia 会话、Router 权限守卫、基础联调页面与后端 CORS

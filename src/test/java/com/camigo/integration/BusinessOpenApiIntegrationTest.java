@@ -10,6 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -44,5 +47,24 @@ class BusinessOpenApiIntegrationTest {
                 .contains("/api/lockers/storage")
                 .contains("/api/evaluations")
                 .contains("/api/statistics/parcels/daily");
+    }
+
+    @Test
+    void shouldAllowViteDevelopmentCorsPreflight() {
+        RequestEntity<Void> request = RequestEntity
+                .method(HttpMethod.OPTIONS,
+                        java.net.URI.create("http://127.0.0.1:" + port + "/api/users/login"))
+                .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization,content-type")
+                .build();
+
+        ResponseEntity<String> response = restTemplate.exchange(request, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getAccessControlAllowOrigin())
+                .isEqualTo("http://localhost:5173");
+        assertThat(response.getHeaders().getAccessControlAllowMethods())
+                .contains(HttpMethod.POST);
     }
 }
