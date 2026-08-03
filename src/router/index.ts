@@ -1,13 +1,8 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 
 import { pinia } from '@/store'
-import { useUserStore, type UserRole } from '@/store/user'
-
-const roleHome: Record<UserRole, string> = {
-  USER: '/user',
-  COURIER: '/courier',
-  ADMIN: '/admin',
-}
+import { useUserStore } from '@/store/user'
+import { ROLE_HOME, type UserRole } from '@/types/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,15 +11,15 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('@/views/LoginPlaceholderView.vue'),
-      meta: { public: true, title: '登录' },
+      component: () => import('@/views/LoginView.vue'),
+      meta: { public: true, guestOnly: true, title: '登录' },
     },
     ...(['USER', 'COURIER', 'ADMIN'] as const).map((role) => ({
-      path: roleHome[role],
+      path: ROLE_HOME[role],
       name: role.toLowerCase(),
       component: () => import('@/views/RolePlaceholderView.vue'),
       props: { role },
-      meta: { requiresAuth: true, roles: [role], title: roleHome[role].slice(1) },
+      meta: { requiresAuth: true, roles: [role], title: ROLE_HOME[role].slice(1) },
     })),
     {
       path: '/:pathMatch(.*)*',
@@ -38,18 +33,15 @@ const router = createRouter({
 router.beforeEach((to) => {
   const userStore = useUserStore(pinia)
 
-  if (to.meta.public) {
-    if (to.name === 'login' && userStore.isAuthenticated && userStore.role) {
-      return roleHome[userStore.role]
-    }
-    return true
+  if (to.meta.guestOnly && userStore.isAuthenticated && userStore.role) {
+    return ROLE_HOME[userStore.role]
   }
 
-  if (!userStore.isAuthenticated || !userStore.role) {
+  if (to.meta.requiresAuth && (!userStore.isAuthenticated || !userStore.role)) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (!canAccess(to, userStore.role)) return roleHome[userStore.role]
+  if (userStore.role && !canAccess(to, userStore.role)) return ROLE_HOME[userStore.role]
   return true
 })
 

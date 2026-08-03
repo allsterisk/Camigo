@@ -3,7 +3,7 @@
 ## Phase 6 进度
 
 - [x] Step 1：初始化 Vue 3 工程并配置 Router、Pinia、Element Plus、Axios
-- [ ] Step 2：登录认证体系
+- [x] Step 2：登录认证体系
 - [ ] Step 3：学生用户端
 - [ ] Step 4：配送员端
 - [ ] Step 5：管理员后台
@@ -30,3 +30,30 @@
 ## 品牌资源说明
 
 当前附件作为深蓝色与白色视觉方向参考。原图包含大面积留白和生成水印，暂不直接作为生产资源；登录页与整体布局开发时应使用裁切后的无水印透明版本。
+
+## Step 2 登录认证体系
+
+### 组件边界
+
+| 模块 | 职责 |
+| --- | --- |
+| `LoginView.vue` | 组合品牌面板和登录表单，不直接持有业务状态 |
+| `LoginBrandPanel.vue` | 展示 Camigo 品牌与角色说明 |
+| `LoginForm.vue` | 表单输入、Element Plus 校验和类型化提交事件 |
+| `useLogin.ts` | 管理提交状态、错误提示和登录后的安全跳转 |
+| `store/user.ts` | 登录请求、会话持久化、用户资料与退出登录 |
+| `router/index.ts` | 公开路由、访客专属路由和角色访问控制 |
+
+### 登录流程
+
+1. 表单提交 `account` 与 `password` 到 `POST /api/users/login`。
+2. Pinia 校验响应中的 Token 与角色，并将会话保存到 `localStorage`。
+3. Axios 后续请求自动附加 `Authorization: Bearer <token>`。
+4. Router 根据 USER、COURIER 或 ADMIN 跳转到相应入口；不合法的 `redirect` 参数会回退到角色首页。
+5. 受保护请求返回 401 时，统一清除会话并跳回登录页。
+
+### 安全约束
+
+- 不在源码或环境示例中保存联调账号密码与 JWT。
+- 仅允许已知角色进入受保护路由，损坏或旧版会话会在启动时自动清理。
+- 页面只通过领域 API 模块访问后端，不直接调用 Axios。

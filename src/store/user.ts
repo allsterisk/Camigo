@@ -1,37 +1,51 @@
-import { computed, ref } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 
-export type UserRole = 'USER' | 'COURIER' | 'ADMIN'
-
-export interface UserInfo {
-  id: number
-  username: string
-  nickname?: string
-}
+import { login as loginRequest } from '@/api/user'
+import {
+  isUserRole,
+  selectPrimaryRole,
+  type LoginCredentials,
+  type UserInfo,
+  type UserRole,
+} from '@/types/auth'
 
 interface PersistedSession {
   token: string
   role: UserRole
-  userInfo: UserInfo | null
+  userInfo: UserInfo
 }
 
 const SESSION_KEY = 'camigo.session'
 
 export const useUserStore = defineStore('user', () => {
   const session = readSession()
-  const token = ref(session?.token ?? '')
-  const role = ref<UserRole | null>(session?.role ?? null)
-  const userInfo = ref<UserInfo | null>(session?.userInfo ?? null)
-  const isAuthenticated = computed(() => Boolean(token.value && role.value))
+  const token = shallowRef(session?.token ?? '')
+  const role = shallowRef<UserRole | null>(session?.role ?? null)
+  const userInfo = shallowRef<UserInfo | null>(session?.userInfo ?? null)
+  const isAuthenticated = computed(() => Boolean(token.value && role.value && userInfo.value))
+  const displayName = computed(() => userInfo.value?.realName || userInfo.value?.username || '')
 
-  function setSession(nextToken: string, nextRole: UserRole, nextUserInfo: UserInfo | null = null) {
+  async function login(credentials: LoginCredentials): Promise<UserRole> {
+    const response = await loginRequest({
+      account: credentials.account.trim(),
+      password: credentials.password,
+    })
+    const primaryRole = selectPrimaryRole(response.user.roles)
+    if (!response.accessToken || !primaryRole) throw new Error('登录响应缺少有效的 Token 或角色')
+
+    setSession(response.accessToken, primaryRole, response.user)
+    return primaryRole
+  }
+
+  function setSession(nextToken: string, nextRole: UserRole, nextUserInfo: UserInfo) {
     token.value = nextToken
     role.value = nextRole
     userInfo.value = nextUserInfo
     persistSession()
   }
 
-  function setUserInfo(nextUserInfo: UserInfo | null) {
+  function setUserInfo(nextUserInfo: UserInfo) {
     userInfo.value = nextUserInfo
     persistSession()
   }
@@ -44,21 +58,53 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function persistSession() {
-    if (!token.value || !role.value) return
+    if (!token.value || !role.value || !userInfo.value) return
     const value: PersistedSession = { token: token.value, role: role.value, userInfo: userInfo.value }
     localStorage.setItem(SESSION_KEY, JSON.stringify(value))
   }
 
-  return { token, role, userInfo, isAuthenticated, setSession, setUserInfo, logout }
+  return {
+    token,
+    role,
+    userInfo,
+    isAuthenticated,
+    displayName,
+    login,
+    setSession,
+    setUserInfo,
+    logout,
+  }
 })
 
 function readSession(): PersistedSession | null {
   const raw = localStorage.getItem(SESSION_KEY)
   if (!raw) return null
+
   try {
-    return JSON.parse(raw) as PersistedSession
+    const value = JSON.parse(raw) as Partial<PersistedSession>
+    if (
+      typeof value.token !== 'string' ||
+      !value.token ||
+      !isUserRole(value.role) ||
+      !isUserInfo(value.userInfo)
+    ) {
+      throw new Error('Invalid session')
+    }
+    return value as PersistedSession
   } catch {
     localStorage.removeItem(SESSION_KEY)
     return null
   }
+}
+
+function isUserInfo(value: unknown): value is UserInfo {
+  if (typeof value !== 'object' || value === null) return false
+  const user = value as Partial<UserInfo>
+  return (
+    typeof user.id === 'number' &&
+    typeof user.username === 'string' &&
+    typeof user.realName === 'string' &&
+    Array.isArray(user.roles) &&
+    user.roles.some(isUserRole)
+  )
 }

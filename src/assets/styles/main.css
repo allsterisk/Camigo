@@ -39,6 +39,7 @@ button, input, textarea, select { font: inherit; }
 
 .phase-card h1 { margin: 12px 0; font-size: clamp(28px, 5vw, 40px); }
 .phase-card p { margin: 0 0 24px; color: #60758a; line-height: 1.8; }
+.phase-card--wide { width: min(780px, 100%); }
 
 @media (max-width: 640px) {
   .phase-card { padding: 30px 24px; }
