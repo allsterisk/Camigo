@@ -66,9 +66,10 @@ mvn spring-boot:run
 | 快递 | `GET /api/parcels/{id}` | 按对象权限查询快递详情 |
 | 快递 | `PUT /api/parcels/{id}/status` | 更新状态或确认取件完成 |
 | 快递 | `DELETE /api/parcels/{id}` | 管理员删除未进入业务流程的快递 |
-| 配送 | `POST /api/delivery/orders` | 创建配送任务 |
-| 配送 | `PUT /api/delivery/orders/{id}/accept` | 配送员接单 |
-| 配送 | `PUT /api/delivery/orders/status` | 更新配送状态 |
+| 配送 | `POST /api/delivery-orders` | 用户为本人快递创建配送任务 |
+| 配送 | `GET /api/delivery-orders/tasks` | 配送员分页查询可接及本人任务 |
+| 配送 | `PUT /api/delivery-orders/{id}/accept` | 配送员并发安全接单 |
+| 配送 | `PUT /api/delivery-orders/{id}/status` | 配送员更新本人任务公共状态 |
 | 智能柜 | `POST /api/lockers/storage` | 包裹入柜 |
 | 智能柜 | `POST /api/lockers/pickup` | 用户取件 |
 | 智能柜 | `GET /api/lockers/{id}/status` | 柜机格口状态汇总 |

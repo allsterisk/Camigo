@@ -3,7 +3,7 @@
 > 阶段：Phase 5 / Step 1 后端接口设计确认  
 > 版本：v1.0-draft  
 > 日期：2026-08-03  
-> 状态：设计已确认；Step 2 用户模块与 Step 3 快递模块 API 已实施
+> 状态：设计已确认；Step 2～Step 4 后端业务模块 API 已实施
 
 ## 1. 目标与范围
 
@@ -277,6 +277,13 @@ WAITING -> PROCESSING -> DELIVERED
 
 接单必须使用行锁/条件更新保证同一订单只能由一个配送员接取。
 
+Step 4 已实现以下业务约束：
+
+- 配送员任务列表只返回未分配的可接任务以及当前配送员自己的任务，并支持公共状态分页筛选。
+- 接单时同时锁定配送员档案与配送订单，校验任职状态、在线接单状态和最大活动任务数。
+- 配送状态对前端只暴露 `WAITING`、`PROCESSING`、`DELIVERED`，内部细粒度状态不进入请求契约。
+- 配送任务送达后释放空闲配送员；关联快递继续保持配送中，直到快递柜入柜事务将其更新为待取件，避免绕过入柜记录与格口锁定。
+
 ## 8. 智能快递柜 API
 
 基础路径：`/api/lockers`
@@ -348,7 +355,7 @@ Axios 请求拦截器从 Pinia 持久化状态读取 Token 并添加 Bearer Head
 | 项目 | Phase 4 现状 | Phase 5 目标 | 实施步骤 |
 |---|---|---|---|
 | 用户路径 | `/api/user` | `/api/users` | Step 2 |
-| 配送路径 | `/api/delivery/orders` | `/api/delivery-orders` | Step 4 |
+| 配送路径 | `/api/delivery/orders` | `/api/delivery-orders` | Step 4（已完成） |
 | 状态更新 | ID 在请求体或 `/status` | `/{id}/status` | Step 3/4 |
 | 成功业务码 | `0` | `200` | Step 2 先统一基础设施 |
 | 错误业务码 | `40xxx/41xxx...` | HTTP 语义码 | Step 2 统一映射 |
@@ -357,7 +364,7 @@ Axios 请求拦截器从 Pinia 持久化状态读取 Token 并添加 Bearer Head
 | 用户修改 | 缺失 | `PUT /api/users/{id}` | Step 2 |
 | 我的快递 | 通用 `/api/parcels` | `/api/parcels/my` | Step 3 |
 | 目标快递柜 | 快递表未保存 | `target_locker_id` | Step 3 数据迁移 |
-| 配送员任务列表 | 缺失 | `/tasks` | Step 4 |
+| 配送员任务列表 | 缺失 | `/tasks` | Step 4（已完成） |
 | 快递柜列表/格口 | 仅 `/{id}/status` | `/` 与 `/{id}/slots` | 后续联调补齐 |
 | 评价查询 | 缺失 | `/{orderId}` | 后续联调补齐 |
 | 统计路径 | 三个旧路径 | Phase 5 三个目标路径 | 后续联调补齐 |
@@ -386,5 +393,5 @@ Axios 请求拦截器从 Pinia 持久化状态读取 Token 并添加 Bearer Head
 - [x] Step 1：后端接口设计确认
 - [x] Step 2：统一响应码、用户注册/登录/信息/修改接口、USER 角色迁移
 - [x] Step 3：快递模块 API、角色授权、目标快递柜关联与完成确认
-- [ ] Step 4：配送模块 API
+- [x] Step 4：配送模块 API、任务分页、公共状态映射、容量与并发接单控制
 - [ ] Step 5：Vue3 Axios 联调

@@ -37,7 +37,10 @@ class BusinessOpenApiIntegrationTest {
                 .contains("/api/parcels")
                 .contains("/api/parcels/my")
                 .contains("/api/parcels/{id}/status")
-                .contains("/api/delivery/orders")
+                .contains("/api/delivery-orders")
+                .contains("/api/delivery-orders/tasks")
+                .contains("/api/delivery-orders/{id}/accept")
+                .contains("/api/delivery-orders/{id}/status")
                 .contains("/api/lockers/storage")
                 .contains("/api/evaluations")
                 .contains("/api/statistics/parcels/daily");
