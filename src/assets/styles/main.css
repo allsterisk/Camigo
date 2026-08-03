@@ -1,0 +1,45 @@
+:root {
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #0b2f53;
+  background: #f4f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { min-height: 100%; margin: 0; }
+body { min-width: 320px; }
+button, input, textarea, select { font: inherit; }
+
+.phase-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 15%, rgb(35 109 171 / 14%), transparent 35%),
+    linear-gradient(145deg, #f8fbff 0%, #edf4fb 100%);
+}
+
+.phase-card {
+  width: min(560px, 100%);
+  padding: 44px;
+  border: 1px solid rgb(10 66 112 / 10%);
+  border-radius: 22px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 22px 70px rgb(8 53 91 / 12%);
+}
+
+.phase-card__eyebrow {
+  color: #176aa6;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.phase-card h1 { margin: 12px 0; font-size: clamp(28px, 5vw, 40px); }
+.phase-card p { margin: 0 0 24px; color: #60758a; line-height: 1.8; }
+
+@media (max-width: 640px) {
+  .phase-card { padding: 30px 24px; }
+}

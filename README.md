@@ -1,27 +1,19 @@
 # Camigo Web
 
-Camigo（校速达）Vue 3 前端联调项目，使用 Vite、Element Plus、Axios、Vue Router 和 Pinia。
+Camigo（校速达）校园智能快递系统前端。Phase 6 采用 Vue 3、Vite、TypeScript、Vue Router、Pinia、Element Plus、Axios 与 ECharts。
 
-## 环境变量
+## 本地开发
 
-复制 `.env.example` 为 `.env.local`，按需修改：
-
-```text
-VITE_API_BASE_URL=http://localhost:8080/api
-```
-
-## 启动
-
-```shell
+```bash
 npm install
 npm run dev
 ```
 
-浏览器访问 `http://127.0.0.1:5173`。后端默认运行于 `http://localhost:8080`。
+后端默认运行于 `http://localhost:8080`，前端默认运行于 `http://127.0.0.1:5173`。可复制 `.env.example` 为 `.env.local` 调整 API 地址。
 
-## Axios 联调规则
+## 校验
 
-- 请求自动读取本地会话并添加 `Authorization: Bearer <token>`。
-- 成功响应自动解包后端统一的 `Result<T>.data`。
-- 400、403、404、409、500 使用 Element Plus 统一提示。
-- 401 自动清除会话并跳转登录页，保留原目标路径。
+```bash
+npm run type-check
+npm run build
+```
