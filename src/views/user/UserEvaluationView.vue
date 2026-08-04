@@ -1,15 +1,33 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+
 import PageHeader from '@/components/common/PageHeader.vue'
 import EvaluationForm from '@/components/user/EvaluationForm.vue'
 import { useEvaluation } from '@/composables/useEvaluation'
 import { formatDateTime } from '@/utils/parcel'
 
-const { loading, errorMessage, result, submit, reset } = useEvaluation()
+const {
+  loading,
+  errorMessage,
+  result,
+  orders,
+  ordersLoading,
+  ordersError,
+  loadOrders,
+  submit,
+  reset,
+} = useEvaluation()
+
+onMounted(loadOrders)
 </script>
 
 <template>
   <div>
-    <PageHeader eyebrow="SERVICE REVIEW" title="配送评价" description="为已完成的校园配送留下星级评分和体验反馈。" />
+    <PageHeader
+      eyebrow="SERVICE REVIEW"
+      title="配送评价"
+      description="为已完成的校园配送留下星级评分和体验反馈。"
+    />
     <section v-if="result" class="evaluation-success">
       <span class="evaluation-success__icon">✓</span>
       <h2>评价提交成功</h2>
@@ -17,7 +35,16 @@ const { loading, errorMessage, result, submit, reset } = useEvaluation()
       <small>提交时间：{{ formatDateTime(result.evaluatedTime) }}</small>
       <el-button type="primary" plain @click="reset">继续评价</el-button>
     </section>
-    <EvaluationForm v-else :loading="loading" :error-message="errorMessage" @submit="submit" />
+    <EvaluationForm
+      v-else
+      :loading="loading"
+      :error-message="errorMessage"
+      :orders="orders"
+      :orders-loading="ordersLoading"
+      :orders-error="ordersError"
+      @reload-orders="loadOrders"
+      @submit="submit"
+    />
   </div>
 </template>
 
