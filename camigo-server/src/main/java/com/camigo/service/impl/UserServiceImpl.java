@@ -2,7 +2,9 @@ package com.camigo.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.camigo.common.ErrorCodes;
+import com.camigo.common.PageResult;
 import com.camigo.dto.UserLoginDTO;
 import com.camigo.dto.UserRegisterDTO;
 import com.camigo.dto.UserUpdateDTO;
@@ -19,12 +21,16 @@ import com.camigo.service.UserService;
 import com.camigo.utils.JwtUtil;
 import com.camigo.utils.PasswordUtil;
 import com.camigo.vo.LoginVO;
+import com.camigo.vo.AdminUserVO;
 import com.camigo.vo.UserInfoVO;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +45,8 @@ public class UserServiceImpl implements UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
     private static final String USER_ROLE = "USER";
     private static final String ADMIN_ROLE = "ADMIN";
+    private static final Set<String> USER_STATUSES = Set.of("ACTIVE", "DISABLED", "LOCKED", "CANCELLED");
+    private static final Set<String> ROLE_CODES = Set.of("USER", "COURIER", "ADMIN");
 
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
@@ -185,6 +193,56 @@ public class UserServiceImpl implements UserService {
         logger.info("Updated user profile, operatorUserId={}, targetUserId={}",
                 currentUserId, targetUserId);
         return toUserInfo(target, userMapper.selectRoleCodes(targetUserId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<AdminUserVO> listUsers(Long currentUserId, long page, long pageSize,
+                                             String keyword, String status, String role) {
+        requireAdmin(currentUserId);
+        String normalizedStatus = normalizeFilter(status, USER_STATUSES, "用户状态");
+        String normalizedRole = normalizeFilter(role, ROLE_CODES, "用户角色");
+        Page<AdminUserVO> result = userMapper.selectAdminPage(new Page<>(page, pageSize),
+                StringUtils.hasText(keyword) ? keyword.trim() : null, normalizedStatus, normalizedRole);
+        return new PageResult<>(result.getRecords(), result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(Long currentUserId, Long targetUserId) {
+        requireAdmin(currentUserId);
+        if (currentUserId.equals(targetUserId)) {
+            throw new ForbiddenException("管理员不能删除自己的账号");
+        }
+        if (userMapper.selectById(targetUserId) == null) {
+            throw new ResourceNotFoundException("用户不存在");
+        }
+        try {
+            userRoleMapper.delete(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, targetUserId));
+            if (userMapper.deleteById(targetUserId) != 1) {
+                throw new ResourceNotFoundException("用户不存在");
+            }
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException(ErrorCodes.USER_CONFLICT,
+                    "用户已有业务数据，不能删除；可改为停用账号");
+        }
+        logger.info("Deleted user, operatorUserId={}, targetUserId={}", currentUserId, targetUserId);
+    }
+
+    private void requireAdmin(Long userId) {
+        if (!normalizeRoles(userMapper.selectRoleCodes(userId)).contains(ADMIN_ROLE)) {
+            throw new ForbiddenException("需要管理员权限");
+        }
+    }
+
+    private String normalizeFilter(String value, Set<String> allowed, String label) {
+        if (!StringUtils.hasText(value)) return null;
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(normalized)) {
+            throw new BusinessException(ErrorCodes.USER_PROFILE_INVALID,
+                    label + "筛选条件不合法", HttpStatus.BAD_REQUEST);
+        }
+        return normalized;
     }
 
     private void ensureRegistrationUnique(String username, String phone, String studentNo) {

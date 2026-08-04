@@ -1,5 +1,7 @@
 package com.camigo.controller;
 
+import com.camigo.annotation.RequireRoles;
+import com.camigo.common.PageResult;
 import com.camigo.common.Result;
 import com.camigo.dto.UserLoginDTO;
 import com.camigo.dto.UserRegisterDTO;
@@ -7,6 +9,7 @@ import com.camigo.dto.UserUpdateDTO;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.UserService;
 import com.camigo.vo.LoginVO;
+import com.camigo.vo.AdminUserVO;
 import com.camigo.vo.UserInfoVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,8 +19,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -25,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * 用户注册、登录和当前用户接口。
@@ -96,5 +103,28 @@ public class UserController {
             @PathVariable @Positive(message = "用户编号必须为正数") Long id,
             @Valid @RequestBody UserUpdateDTO request) {
         return Result.success(userService.updateUser(currentUserId, id, request));
+    }
+
+    @Operation(summary = "管理员分页查询用户")
+    @RequireRoles("ADMIN")
+    @GetMapping
+    public Result<PageResult<AdminUserVO>> list(
+            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long currentUserId,
+            @RequestParam(defaultValue = "1") @Min(1) long page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) long pageSize,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String role) {
+        return Result.success(userService.listUsers(currentUserId, page, pageSize, keyword, status, role));
+    }
+
+    @Operation(summary = "管理员删除无业务数据的用户")
+    @RequireRoles("ADMIN")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(
+            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long currentUserId,
+            @PathVariable @Positive(message = "用户编号必须为正数") Long id) {
+        userService.deleteUser(currentUserId, id);
+        return Result.success();
     }
 }

@@ -6,15 +6,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.camigo.dto.UserRegisterDTO;
+import com.camigo.common.PageResult;
 import com.camigo.dto.UserUpdateDTO;
 import com.camigo.exception.GlobalExceptionHandler;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.UserService;
 import com.camigo.vo.UserInfoVO;
+import com.camigo.vo.AdminUserVO;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,6 +97,29 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.code").value(200));
 
         verify(userService).updateUser(eq(7L), eq(7L), any(UserUpdateDTO.class));
+    }
+
+    @Test
+    void shouldListUsersForAdmin() throws Exception {
+        AdminUserVO user = new AdminUserVO(7L, "student_001", "张三", "13800138000",
+                "20260001", "ACTIVE", "USER", null, LocalDateTime.now(), LocalDateTime.now());
+        when(userService.listUsers(1L, 1, 20, "张", "ACTIVE", "USER"))
+                .thenReturn(new PageResult<>(List.of(user), 1, 1, 20));
+
+        mockMvc.perform(get("/api/users")
+                        .requestAttr(LoginInterceptor.CURRENT_USER_ID, 1L)
+                        .param("keyword", "张").param("status", "ACTIVE").param("role", "USER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].roles[0]").value("USER"));
+    }
+
+    @Test
+    void shouldDeleteUserForAdmin() throws Exception {
+        mockMvc.perform(delete("/api/users/7")
+                        .requestAttr(LoginInterceptor.CURRENT_USER_ID, 1L))
+                .andExpect(status().isOk());
+        verify(userService).deleteUser(1L, 7L);
     }
 
     private UserInfoVO userInfo(Long id, String status) {

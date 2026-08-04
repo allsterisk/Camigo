@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.camigo.dto.UserLoginDTO;
 import com.camigo.dto.UserRegisterDTO;
 import com.camigo.dto.UserUpdateDTO;
@@ -23,7 +24,9 @@ import com.camigo.utils.JwtUtil;
 import com.camigo.utils.PasswordUtil;
 import com.camigo.vo.LoginVO;
 import com.camigo.vo.UserInfoVO;
+import com.camigo.vo.AdminUserVO;
 import java.util.List;
+import java.time.LocalDateTime;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -148,6 +151,29 @@ class UserServiceImplTest {
                 new UserUpdateDTO(null, null, null, "DISABLED"));
 
         assertThat(result.status()).isEqualTo("DISABLED");
+    }
+
+    @Test
+    void shouldListUsersForAdmin() {
+        when(userMapper.selectRoleCodes(1L)).thenReturn(List.of("ADMIN"));
+        Page<AdminUserVO> page = new Page<>(1, 10);
+        page.setRecords(List.of(new AdminUserVO(12L, "student", "学生", "13800138000",
+                "20260001", "ACTIVE", "USER", null, LocalDateTime.now(), LocalDateTime.now())));
+        page.setTotal(1);
+        when(userMapper.selectAdminPage(any(), any(), any(), any())).thenReturn(page);
+
+        var result = service.listUsers(1L, 1, 10, null, "active", "user");
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.records().get(0).roles()).containsExactly("USER");
+    }
+
+    @Test
+    void shouldRejectDeletingOwnAdminAccount() {
+        when(userMapper.selectRoleCodes(1L)).thenReturn(List.of("ADMIN"));
+        assertThatThrownBy(() -> service.deleteUser(1L, 1L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("管理员不能删除自己的账号");
     }
 
     private User activeUser(Long id) {

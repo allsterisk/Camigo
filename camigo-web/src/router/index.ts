@@ -70,13 +70,18 @@ const router = createRouter({
         },
       ],
     },
-    ...(['ADMIN'] as const).map((role) => ({
-      path: ROLE_HOME[role],
-      name: role.toLowerCase(),
-      component: () => import('@/views/RolePlaceholderView.vue'),
-      props: { role },
-      meta: { requiresAuth: true, roles: [role], title: ROLE_HOME[role].slice(1) },
-    })),
+    {
+      path: '/admin',
+      component: () => import('@/layout/AdminLayout.vue'),
+      meta: { requiresAuth: true, roles: ['ADMIN'] },
+      children: [
+        { path: '', name: 'admin-dashboard', component: () => import('@/views/admin/AdminDashboardView.vue'), meta: { title: '运营概览' } },
+        { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUsersView.vue'), meta: { title: '用户管理' } },
+        { path: 'parcels', name: 'admin-parcels', component: () => import('@/views/admin/AdminParcelsView.vue'), meta: { title: '快递管理' } },
+        { path: 'couriers', name: 'admin-couriers', component: () => import('@/views/admin/AdminCouriersView.vue'), meta: { title: '配送员管理' } },
+        { path: 'lockers', name: 'admin-lockers', component: () => import('@/views/admin/AdminLockersView.vue'), meta: { title: '快递柜管理' } },
+      ],
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',

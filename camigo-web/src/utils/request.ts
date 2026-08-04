@@ -68,6 +68,10 @@ export function put<TResponse, TBody>(url: string, data?: TBody): Promise<TRespo
   return request.put<ApiEnvelope<TResponse>, TResponse, TBody>(url, data)
 }
 
+export function del<TResponse>(url: string): Promise<TResponse> {
+  return request.delete<ApiEnvelope<TResponse>, TResponse>(url)
+}
+
 export function getRequestErrorMessage(error: unknown, fallback = '请求未能完成'): string {
   if (axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
     return error.response?.data?.message || fallback

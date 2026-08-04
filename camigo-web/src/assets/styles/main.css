@@ -11,6 +11,16 @@ html, body, #app { min-height: 100%; margin: 0; }
 body { min-width: 320px; }
 button, input, textarea, select { font: inherit; }
 
+.admin-list-card {
+  min-height: 280px;
+  padding: 20px;
+  border: 1px solid #e8e0ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgb(83 48 104 / 5%);
+}
+.admin-list-card .el-pagination { justify-content: flex-end; margin-top: 22px; }
+
 .phase-shell {
   min-height: 100vh;
   display: grid;
