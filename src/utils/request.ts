@@ -1,4 +1,9 @@
-import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import axios, {
+  AxiosError,
+  type AxiosRequestConfig,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 import { ElMessage } from 'element-plus'
 
 import router from '@/router'
@@ -51,8 +56,8 @@ request.interceptors.response.use(
   },
 )
 
-export function get<TResponse>(url: string): Promise<TResponse> {
-  return request.get<ApiEnvelope<TResponse>, TResponse>(url)
+export function get<TResponse>(url: string, config?: AxiosRequestConfig): Promise<TResponse> {
+  return request.get<ApiEnvelope<TResponse>, TResponse>(url, config)
 }
 
 export function post<TResponse, TBody>(url: string, data: TBody): Promise<TResponse> {

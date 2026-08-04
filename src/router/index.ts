@@ -14,7 +14,38 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
       meta: { public: true, guestOnly: true, title: '登录' },
     },
-    ...(['USER', 'COURIER', 'ADMIN'] as const).map((role) => ({
+    {
+      path: '/user',
+      component: () => import('@/layout/UserLayout.vue'),
+      meta: { requiresAuth: true, roles: ['USER'] },
+      children: [
+        {
+          path: '',
+          name: 'user-dashboard',
+          component: () => import('@/views/user/UserDashboardView.vue'),
+          meta: { title: '学生首页' },
+        },
+        {
+          path: 'parcels',
+          name: 'user-parcels',
+          component: () => import('@/views/user/UserParcelsView.vue'),
+          meta: { title: '我的快递' },
+        },
+        {
+          path: 'parcels/:id',
+          name: 'user-parcel-detail',
+          component: () => import('@/views/user/UserParcelDetailView.vue'),
+          meta: { title: '快递详情' },
+        },
+        {
+          path: 'evaluation',
+          name: 'user-evaluation',
+          component: () => import('@/views/user/UserEvaluationView.vue'),
+          meta: { title: '配送评价' },
+        },
+      ],
+    },
+    ...(['COURIER', 'ADMIN'] as const).map((role) => ({
       path: ROLE_HOME[role],
       name: role.toLowerCase(),
       component: () => import('@/views/RolePlaceholderView.vue'),
@@ -36,11 +67,9 @@ router.beforeEach((to) => {
   if (to.meta.guestOnly && userStore.isAuthenticated && userStore.role) {
     return ROLE_HOME[userStore.role]
   }
-
   if (to.meta.requiresAuth && (!userStore.isAuthenticated || !userStore.role)) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-
   if (userStore.role && !canAccess(to, userStore.role)) return ROLE_HOME[userStore.role]
   return true
 })
