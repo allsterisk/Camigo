@@ -1,0 +1,50 @@
+# IDE and editor metadata
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+**/application-*.local.yml
+**/application-*.local.yaml
+**/application-*.local.properties
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Backend build and runtime output
+**/target/
+*.class
+logs/
+**/logs/
+*.log
+*.pid
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# Frontend dependencies and build output
+**/node_modules/
+**/dist/
+
+# Operating system and temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
