@@ -41,4 +41,19 @@ class LoginInterceptorTest {
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(response.getContentAsString()).contains("\"code\":401");
     }
+
+    @Test
+    void shouldAllowCorsPreflightWithoutBearerToken() throws Exception {
+        JwtUtil jwtUtil = new JwtUtil(new JwtProperties(TEST_SECRET, 30));
+        LoginInterceptor interceptor = new LoginInterceptor(jwtUtil, new ObjectMapper());
+        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/parcels/my");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.addHeader(HttpHeaders.ORIGIN, "http://127.0.0.1:5173");
+        request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET");
+
+        boolean accepted = interceptor.preHandle(request, response, new Object());
+
+        assertThat(accepted).isTrue();
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
 }

@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.cors.CorsUtils;
 
 /**
  * 基础 JWT 登录拦截器。Phase 4 后续可扩展 Redis 会话撤销和 RBAC 权限校验。
@@ -33,6 +34,11 @@ public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {
+        // CORS preflight requests carry no JWT and are validated by Spring's CORS handler.
+        if (CorsUtils.isPreFlightRequest(request)) {
+            return true;
+        }
+
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
             writeUnauthorized(response, "请先登录");
