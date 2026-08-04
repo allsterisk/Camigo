@@ -17,6 +17,8 @@ import com.camigo.exception.GlobalExceptionHandler;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.DeliveryOrderService;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.UserDeliveryOrderVO;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,6 +75,26 @@ class DeliveryOrderControllerTest {
                         .param("status", "WAITING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].status").value("WAITING"));
+    }
+
+    @Test
+    void shouldListCurrentStudentsPendingEvaluations() throws Exception {
+        UserDeliveryOrderVO order = new UserDeliveryOrderVO(
+                5L, "DO202608030001", 10L, "SF123456", "SF", 3L,
+                "配送员", "DELIVERED", LocalDateTime.of(2026, 8, 3, 12, 0), false);
+        when(deliveryOrderService.listMy(7L, 1L, 20L, "DELIVERED", false))
+                .thenReturn(new PageResult<>(List.of(order), 1, 1, 20));
+
+        mockMvc.perform(get("/api/delivery-orders/my")
+                        .requestAttr(LoginInterceptor.CURRENT_USER_ID, 7L)
+                        .param("status", "DELIVERED")
+                        .param("evaluated", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].deliveryOrderId").value(5))
+                .andExpect(jsonPath("$.data.records[0].trackingNo").value("SF123456"))
+                .andExpect(jsonPath("$.data.records[0].evaluated").value(false));
+
+        verify(deliveryOrderService).listMy(7L, 1L, 20L, "DELIVERED", false);
     }
 
     @Test

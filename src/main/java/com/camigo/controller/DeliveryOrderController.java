@@ -8,6 +8,7 @@ import com.camigo.dto.DeliveryOrderStatusDTO;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.DeliveryOrderService;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.UserDeliveryOrderVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -68,6 +69,19 @@ public class DeliveryOrderController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(200) long pageSize,
             @RequestParam(required = false) String status) {
         return Result.success(deliveryOrderService.listTasks(userId, page, pageSize, status));
+    }
+
+    @Operation(summary = "查询当前学生的配送订单", description = "支持按公开状态和是否已评价筛选")
+    @RequireRoles("USER")
+    @GetMapping("/my")
+    public Result<PageResult<UserDeliveryOrderVO>> listMy(
+            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
+            @RequestParam(defaultValue = "1") @Min(1) long page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(200) long pageSize,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean evaluated) {
+        return Result.success(deliveryOrderService.listMy(
+                userId, page, pageSize, status, evaluated));
     }
 
     @Operation(summary = "配送员接单", description = "使用数据库行锁保证同一任务只能被一名配送员接取")

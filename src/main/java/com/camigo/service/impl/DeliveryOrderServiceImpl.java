@@ -22,6 +22,7 @@ import com.camigo.mapper.UserMapper;
 import com.camigo.service.DeliveryOrderService;
 import com.camigo.service.ParcelLifecycleService;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.UserDeliveryOrderVO;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -149,6 +150,20 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PageResult<UserDeliveryOrderVO> listMy(Long userId, long page, long pageSize,
+                                                   String status, Boolean evaluated) {
+        requireRole(userId, USER_ROLE);
+        Set<String> internalStatuses = resolvePublicStatuses(status);
+        Page<UserDeliveryOrderVO> result = orderMapper.selectUserOrders(
+                new Page<>(page, pageSize), userId, internalStatuses, evaluated);
+        List<UserDeliveryOrderVO> records = result.getRecords().stream()
+                .map(this::toUserVo)
+                .toList();
+        return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
     @Transactional
     public DeliveryOrderVO accept(Long userId, Long orderId) {
         requireRole(userId, COURIER_ROLE);
@@ -249,6 +264,17 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
             throw invalidStatus("不支持的配送状态筛选条件");
         }
         query.in(DeliveryOrder::getStatus, PUBLIC_TO_INTERNAL_STATUSES.get(normalized));
+    }
+
+    private Set<String> resolvePublicStatuses(String status) {
+        if (!StringUtils.hasText(status)) {
+            return PUBLIC_INTERNAL_STATUSES;
+        }
+        String normalized = status.trim().toUpperCase();
+        if (!PUBLIC_STATUSES.contains(normalized)) {
+            throw invalidStatus("不支持的配送状态筛选条件");
+        }
+        return PUBLIC_TO_INTERNAL_STATUSES.get(normalized);
     }
 
     private void ensureCourierCanAccept(Courier courier) {
@@ -352,5 +378,11 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
             return "DELIVERED";
         }
         return internalStatus;
+    }
+
+    private UserDeliveryOrderVO toUserVo(UserDeliveryOrderVO order) {
+        return new UserDeliveryOrderVO(order.deliveryOrderId(), order.orderNo(), order.parcelId(),
+                order.trackingNo(), order.carrierCode(), order.courierId(), order.courierName(),
+                toPublicStatus(order.status()), order.completedTime(), order.evaluated());
     }
 }

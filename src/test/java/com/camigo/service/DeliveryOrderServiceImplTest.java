@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.camigo.common.PageResult;
 import com.camigo.dto.DeliveryOrderCreateDTO;
 import com.camigo.dto.DeliveryOrderStatusDTO;
 import com.camigo.entity.CampusLocation;
@@ -26,7 +27,10 @@ import com.camigo.mapper.ParcelMapper;
 import com.camigo.mapper.UserMapper;
 import com.camigo.service.impl.DeliveryOrderServiceImpl;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.UserDeliveryOrderVO;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,6 +113,38 @@ class DeliveryOrderServiceImplTest {
 
         assertThat(result).extracting(DeliveryOrderVO::status)
                 .containsExactly("WAITING", "PROCESSING");
+    }
+
+    @Test
+    void shouldListOnlyCurrentUsersUnevaluatedDeliveredOrders() {
+        when(userMapper.selectRoleCodes(7L)).thenReturn(List.of("USER"));
+        UserDeliveryOrderVO databaseRow = new UserDeliveryOrderVO(
+                5L, "DO202608030001", 10L, "SF123456", "SF", 3L,
+                "配送员", "COMPLETED", LocalDateTime.of(2026, 8, 3, 12, 0), false);
+        Page<UserDeliveryOrderVO> databasePage = new Page<>(1, 20, 1);
+        databasePage.setRecords(List.of(databaseRow));
+        when(orderMapper.selectUserOrders(any(Page.class), eq(7L),
+                eq(Set.of("COMPLETED")), eq(false))).thenReturn(databasePage);
+
+        PageResult<UserDeliveryOrderVO> result = service.listMy(
+                7L, 1, 20, "DELIVERED", false);
+
+        assertThat(result.records()).hasSize(1);
+        assertThat(result.records().get(0).status()).isEqualTo("DELIVERED");
+        assertThat(result.records().get(0).trackingNo()).isEqualTo("SF123456");
+        verify(orderMapper).selectUserOrders(any(Page.class), eq(7L),
+                eq(Set.of("COMPLETED")), eq(false));
+    }
+
+    @Test
+    void shouldRejectUnsupportedStudentOrderStatus() {
+        when(userMapper.selectRoleCodes(7L)).thenReturn(List.of("USER"));
+
+        assertThatThrownBy(() -> service.listMy(7L, 1, 20, "COMPLETED", false))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        verify(orderMapper, never()).selectUserOrders(any(), any(), any(), any());
     }
 
     @Test
