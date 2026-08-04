@@ -45,7 +45,32 @@ const router = createRouter({
         },
       ],
     },
-    ...(['COURIER', 'ADMIN'] as const).map((role) => ({
+    {
+      path: '/courier',
+      component: () => import('@/layout/CourierLayout.vue'),
+      meta: { requiresAuth: true, roles: ['COURIER'] },
+      children: [
+        {
+          path: '',
+          name: 'courier-dashboard',
+          component: () => import('@/views/courier/CourierDashboardView.vue'),
+          meta: { title: '配送首页' },
+        },
+        {
+          path: 'tasks',
+          name: 'courier-tasks',
+          component: () => import('@/views/courier/CourierTasksView.vue'),
+          meta: { title: '我的任务' },
+        },
+        {
+          path: 'history',
+          name: 'courier-history',
+          component: () => import('@/views/courier/CourierHistoryView.vue'),
+          meta: { title: '配送记录' },
+        },
+      ],
+    },
+    ...(['ADMIN'] as const).map((role) => ({
       path: ROLE_HOME[role],
       name: role.toLowerCase(),
       component: () => import('@/views/RolePlaceholderView.vue'),
