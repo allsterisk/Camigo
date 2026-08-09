@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,7 +10,7 @@ import { useUserStore } from '@/store/user'
 interface MenuItem {
   path: string
   label: string
-  icon: string
+  icon: string | Component
 }
 
 const props = withDefaults(defineProps<{
@@ -55,7 +55,10 @@ async function handleLogout() {
 
       <el-menu class="role-layout__menu" :default-active="activeMenu" router>
         <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
-          <span class="role-layout__menu-icon">{{ item.icon }}</span>{{ item.label }}
+          <span class="role-layout__menu-icon">
+            <component :is="item.icon" v-if="typeof item.icon !== 'string'" />
+            <template v-else>{{ item.icon }}</template>
+          </span>{{ item.label }}
         </el-menu-item>
       </el-menu>
 
@@ -95,6 +98,7 @@ async function handleLogout() {
 .role-layout__menu :deep(.el-menu-item) { height: 50px; margin: 6px 0; border-radius: 11px; color: #587086; }
 .role-layout__menu :deep(.el-menu-item.is-active) { color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 10%, white); font-weight: 700; }
 .role-layout__menu-icon { display: grid; width: 28px; height: 28px; margin-right: 10px; place-items: center; border-radius: 8px; color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 9%, white); font-size: 11px; font-weight: 800; }
+.role-layout__menu-icon :deep(svg) { width: 15px; height: 15px; }
 .role-layout__account { display: flex; align-items: center; gap: 10px; padding: 14px 10px 4px; border-top: 1px solid #edf2f6; }
 .role-layout__avatar { display: grid; flex: 0 0 36px; height: 36px; place-items: center; border-radius: 11px; color: #fff; background: var(--role-accent); font-weight: 800; }
 .role-layout__account-copy { min-width: 0; flex: 1; }
