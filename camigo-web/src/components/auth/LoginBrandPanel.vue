@@ -12,7 +12,7 @@ const roleItems = [
   <section class="brand-panel">
     <div class="brand-panel__glow" aria-hidden="true" />
     <div class="brand-panel__identity">
-      <BrandMark :size="72" />
+      <BrandMark :size="72" seamless />
       <div>
         <strong class="brand-panel__name">校速达</strong>
         <span class="brand-panel__english">CAMIGO</span>
