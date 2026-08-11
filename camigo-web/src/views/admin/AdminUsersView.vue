@@ -7,7 +7,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import { useAdminListQuery } from '@/composables/useAdminListQuery'
 import { useAdminUsers } from '@/composables/useAdminUsers'
 import type { AdminUser, UserStatus } from '@/types/admin'
-const options = [{ label: '正常', value: 'ACTIVE' }, { label: '停用', value: 'DISABLED' }, { label: '锁定', value: 'LOCKED' }, { label: '已注销', value: 'CANCELLED' }]
+const options = [{ label: '正常', value: 'ACTIVE' }, { label: '停用', value: 'DISABLED' }, { label: '已注销', value: 'CANCELLED' }]
 const { route, keyword, status, page, search, reset, setPage } = useAdminListQuery('status')
 const { records, total, loading, actionId, errorMessage, load, changeStatus, remove } = useAdminUsers()
 function refresh() { return load({ page: page.value, pageSize: 10, keyword: String(route.query.keyword || ''), status: (route.query.status || '') as UserStatus | '' }) }

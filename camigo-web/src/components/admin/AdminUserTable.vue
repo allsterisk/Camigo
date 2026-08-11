@@ -5,8 +5,16 @@ defineProps<{ users: readonly AdminUser[]; loading: boolean; actionId: number | 
 defineEmits<{ statusChange: [id: number, status: UserStatus]; remove: [user: AdminUser] }>()
 const statuses: { label: string; value: UserStatus }[] = [
   { label: '正常', value: 'ACTIVE' }, { label: '停用', value: 'DISABLED' },
-  { label: '锁定', value: 'LOCKED' }, { label: '已注销', value: 'CANCELLED' },
+  { label: '已注销', value: 'CANCELLED' },
 ]
+
+function isAdministrator(user: AdminUser) {
+  return user.roles.includes('ADMIN')
+}
+
+function isProtectedStatus(user: AdminUser, status: UserStatus) {
+  return isAdministrator(user) && status !== 'ACTIVE'
+}
 </script>
 <template>
   <el-table :data="users" v-loading="loading" row-key="id" stripe>
@@ -15,8 +23,24 @@ const statuses: { label: string; value: UserStatus }[] = [
     <el-table-column label="学号" min-width="120"><template #default="{ row }">{{ row.studentNo || '—' }}</template></el-table-column>
     <el-table-column label="角色" min-width="150"><template #default="{ row }"><el-tag v-for="role in row.roles" :key="role" class="admin-table__tag" effect="plain">{{ role }}</el-tag></template></el-table-column>
     <el-table-column label="注册时间" min-width="170"><template #default="{ row }">{{ formatDateTime(row.createTime) }}</template></el-table-column>
-    <el-table-column label="状态" min-width="130"><template #default="{ row }"><el-select :model-value="row.status" :disabled="actionId !== null" @change="$emit('statusChange', row.id, $event)"><el-option v-for="item in statuses" :key="item.value" :label="item.label" :value="item.value" /></el-select></template></el-table-column>
-    <el-table-column label="操作" fixed="right" width="90"><template #default="{ row }"><el-button text type="danger" :loading="actionId === row.id" @click="$emit('remove', row)">删除</el-button></template></el-table-column>
+    <el-table-column label="状态" min-width="130">
+      <template #default="{ row }">
+        <el-tooltip :content="isAdministrator(row) ? '管理员账号不可停用或注销' : ''" :disabled="!isAdministrator(row)">
+          <el-select :model-value="row.status" :disabled="actionId !== null" @change="$emit('statusChange', row.id, $event)">
+            <el-option v-for="item in statuses" :key="item.value" :label="item.label" :value="item.value" :disabled="isProtectedStatus(row, item.value)" />
+          </el-select>
+        </el-tooltip>
+      </template>
+    </el-table-column>
+    <el-table-column label="操作" fixed="right" width="90">
+      <template #default="{ row }">
+        <el-tooltip :content="isAdministrator(row) ? '管理员账号不可停用或注销' : ''" :disabled="!isAdministrator(row)">
+          <span>
+            <el-button text type="danger" :disabled="isAdministrator(row)" :loading="actionId === row.id" @click="$emit('remove', row)">删除</el-button>
+          </span>
+        </el-tooltip>
+      </template>
+    </el-table-column>
   </el-table>
 </template>
 <style scoped>.admin-table__tag { margin: 2px 4px 2px 0; } small { color: #8695a2; }</style>

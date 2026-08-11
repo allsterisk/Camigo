@@ -1,6 +1,6 @@
 import type { ParcelQuery } from '@/types/parcel'
 
-export type UserStatus = 'ACTIVE' | 'DISABLED' | 'LOCKED' | 'CANCELLED'
+export type UserStatus = 'ACTIVE' | 'DISABLED' | 'CANCELLED'
 export type AdminRole = 'USER' | 'COURIER' | 'ADMIN'
 
 export interface AdminUser {

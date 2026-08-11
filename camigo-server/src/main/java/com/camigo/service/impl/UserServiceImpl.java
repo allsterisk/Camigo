@@ -45,7 +45,7 @@ public class UserServiceImpl implements UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
     private static final String USER_ROLE = "USER";
     private static final String ADMIN_ROLE = "ADMIN";
-    private static final Set<String> USER_STATUSES = Set.of("ACTIVE", "DISABLED", "LOCKED", "CANCELLED");
+    private static final Set<String> USER_STATUSES = Set.of("ACTIVE", "DISABLED", "CANCELLED");
     private static final Set<String> ROLE_CODES = Set.of("USER", "COURIER", "ADMIN");
 
     private final UserMapper userMapper;
@@ -115,9 +115,17 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ErrorCodes.USER_INVALID_CREDENTIALS,
                     "账号或密码错误", HttpStatus.UNAUTHORIZED);
         }
+        if ("DISABLED".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCodes.USER_DISABLED,
+                    "账号已停用，请联系管理员", HttpStatus.FORBIDDEN);
+        }
+        if ("CANCELLED".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCodes.USER_CANCELLED,
+                    "账号已注销，无法登录", HttpStatus.FORBIDDEN);
+        }
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new BusinessException(ErrorCodes.USER_DISABLED,
-                    "账号当前不可用", HttpStatus.FORBIDDEN);
+                    "账号状态异常，请联系管理员", HttpStatus.FORBIDDEN);
         }
 
         userMapper.update(null, new LambdaUpdateWrapper<User>()

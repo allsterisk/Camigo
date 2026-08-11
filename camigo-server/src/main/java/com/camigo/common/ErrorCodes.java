@@ -11,6 +11,7 @@ public final class ErrorCodes {
     public static final int USER_NOT_FOUND = 41004;
     public static final int ROLE_NOT_CONFIGURED = 41005;
     public static final int USER_PROFILE_INVALID = 41006;
+    public static final int USER_CANCELLED = 41007;
 
     public static final int PARCEL_NOT_FOUND = 42001;
     public static final int PARCEL_CONFLICT = 42002;

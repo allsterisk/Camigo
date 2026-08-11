@@ -22,7 +22,7 @@ public record UserUpdateDTO(
         String studentNo,
 
         @Schema(description = "账号状态，仅管理员可修改", example = "ACTIVE")
-        @Pattern(regexp = "ACTIVE|DISABLED|LOCKED|CANCELLED",
-                message = "账号状态只能为ACTIVE、DISABLED、LOCKED或CANCELLED")
+        @Pattern(regexp = "ACTIVE|DISABLED|CANCELLED",
+                message = "账号状态只能为ACTIVE、DISABLED或CANCELLED")
         String status) {
 }

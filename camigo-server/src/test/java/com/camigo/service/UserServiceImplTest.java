@@ -15,6 +15,7 @@ import com.camigo.dto.UserUpdateDTO;
 import com.camigo.entity.Role;
 import com.camigo.entity.User;
 import com.camigo.entity.UserRole;
+import com.camigo.exception.BusinessException;
 import com.camigo.exception.ForbiddenException;
 import com.camigo.mapper.RoleMapper;
 import com.camigo.mapper.UserMapper;
@@ -112,6 +113,32 @@ class UserServiceImplTest {
     }
 
     @Test
+    void shouldExplainDisabledAccountDuringLogin() {
+        User user = loginUser("DISABLED");
+        when(userMapper.selectByAccount("camigo_user")).thenReturn(user);
+        when(passwordUtil.matches("Camigo@123", "bcrypt-hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.login(new UserLoginDTO("camigo_user", "Camigo@123")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("账号已停用，请联系管理员")
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(41003);
+    }
+
+    @Test
+    void shouldExplainCancelledAccountDuringLogin() {
+        User user = loginUser("CANCELLED");
+        when(userMapper.selectByAccount("camigo_user")).thenReturn(user);
+        when(passwordUtil.matches("Camigo@123", "bcrypt-hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.login(new UserLoginDTO("camigo_user", "Camigo@123")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("账号已注销，无法登录")
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(41007);
+    }
+
+    @Test
     void shouldUpdateOwnProfile() {
         User user = activeUser(11L);
         when(userMapper.selectRoleCodes(11L)).thenReturn(List.of("USER"));
@@ -185,6 +212,17 @@ class UserServiceImplTest {
         user.setPhone("13800138000");
         user.setStudentNo("20260001");
         user.setStatus("ACTIVE");
+        return user;
+    }
+
+    private User loginUser(String status) {
+        User user = new User();
+        user.setId(11L);
+        user.setUsername("camigo_user");
+        user.setPasswordHash("bcrypt-hash");
+        user.setRealName("测试用户");
+        user.setPhone("13800138000");
+        user.setStatus(status);
         return user;
     }
 }
