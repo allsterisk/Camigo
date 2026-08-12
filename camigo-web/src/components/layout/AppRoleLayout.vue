@@ -97,7 +97,7 @@ async function handleLogout() {
 .role-layout__menu { flex: 1; border-right: 0; }
 .role-layout__menu :deep(.el-menu-item) { height: 50px; margin: 6px 0; border-radius: 11px; color: #587086; }
 .role-layout__menu :deep(.el-menu-item.is-active) { color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 10%, white); font-weight: 700; }
-.role-layout__menu-icon { display: grid; width: 28px; height: 28px; margin-right: 10px; place-items: center; border-radius: 8px; color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 9%, white); font-size: 11px; font-weight: 800; }
+.role-layout__menu-icon { display: inline-flex; flex: 0 0 28px; width: 28px; height: 28px; align-items: center; justify-content: center; margin-right: 10px; border-radius: 8px; color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 9%, white); font-size: 11px; font-weight: 800; line-height: 1; text-align: center; }
 .role-layout__menu-icon :deep(svg) { width: 15px; height: 15px; }
 .role-layout__account { display: flex; align-items: center; gap: 10px; padding: 14px 10px 4px; border-top: 1px solid #edf2f6; }
 .role-layout__avatar { display: grid; flex: 0 0 36px; height: 36px; place-items: center; border-radius: 11px; color: #fff; background: var(--role-accent); font-weight: 800; }
