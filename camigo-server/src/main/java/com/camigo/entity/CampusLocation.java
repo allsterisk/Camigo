@@ -20,5 +20,7 @@ public class CampusLocation extends BaseEntity {
     private String addressDetail;
     private BigDecimal longitude;
     private BigDecimal latitude;
+    private Integer pickupEnabled;
+    private Integer deliveryEnabled;
     private String status;
 }

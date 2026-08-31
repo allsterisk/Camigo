@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 
 import BrandMark from '@/components/brand/BrandMark.vue'
+import { setCourierOffline } from '@/api/courier-execution'
 import { useUserStore } from '@/store/user'
 
 interface MenuItem {
@@ -36,6 +37,13 @@ const activeMenu = computed(() => (
 ))
 
 async function handleLogout() {
+  if (userStore.role === 'COURIER') {
+    try {
+      await setCourierOffline()
+    } catch {
+      // 本地会话必须能正常退出；服务端失效会由下次登录再次置为OFFLINE。
+    }
+  }
   userStore.logout()
   await router.replace({ name: 'login' })
   ElMessage.success('已安全退出登录')
@@ -68,7 +76,7 @@ async function handleLogout() {
           <strong>{{ displayName }}</strong>
           <small>{{ userInfo?.studentNo || userInfo?.username }}</small>
         </span>
-        <el-button text @click="handleLogout">退出</el-button>
+        <el-button class="role-layout__logout" text @click="handleLogout">退出登录</el-button>
       </div>
     </aside>
 
@@ -99,12 +107,13 @@ async function handleLogout() {
 .role-layout__menu :deep(.el-menu-item.is-active) { color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 10%, white); font-weight: 700; }
 .role-layout__menu-icon { display: inline-flex; flex: 0 0 28px; width: 28px; height: 28px; align-items: center; justify-content: center; margin-right: 10px; border-radius: 8px; color: var(--role-accent); background: color-mix(in srgb, var(--role-accent) 9%, white); font-size: 11px; font-weight: 800; line-height: 1; text-align: center; }
 .role-layout__menu-icon :deep(svg) { width: 15px; height: 15px; }
-.role-layout__account { display: flex; align-items: center; gap: 10px; padding: 14px 10px 4px; border-top: 1px solid #edf2f6; }
-.role-layout__avatar { display: grid; flex: 0 0 36px; height: 36px; place-items: center; border-radius: 11px; color: #fff; background: var(--role-accent); font-weight: 800; }
+.role-layout__account { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 6px 10px; padding: 14px 10px 4px; border-top: 1px solid #edf2f6; }
+.role-layout__avatar { display: grid; grid-row: 1 / span 2; height: 36px; place-items: center; border-radius: 11px; color: #fff; background: var(--role-accent); font-weight: 800; }
 .role-layout__account-copy { min-width: 0; flex: 1; }
-.role-layout__account-copy strong, .role-layout__account-copy small { overflow: hidden; display: block; text-overflow: ellipsis; white-space: nowrap; }
-.role-layout__account-copy strong { color: #274c6b; font-size: 13px; }
-.role-layout__account-copy small { margin-top: 3px; color: #96a5b2; font-size: 10px; }
+.role-layout__account-copy strong, .role-layout__account-copy small { display: block; overflow-wrap: anywhere; }
+.role-layout__account-copy strong { color: #274c6b; font-size: 13px; line-height: 1.4; }
+.role-layout__account-copy small { margin-top: 3px; color: #6f8495; font-size: 10px; line-height: 1.45; }
+.role-layout__logout { grid-column: 2; justify-self: start; min-height: 32px; margin-left: -8px; }
 .role-layout__workspace { min-width: 0; }
 .role-layout__topbar { height: 74px; display: flex; align-items: center; justify-content: space-between; padding: 0 36px; border-bottom: 1px solid #deebf2; background: rgb(255 255 255 / 86%); backdrop-filter: blur(14px); }
 .role-layout__topbar-copy { display: flex; flex-direction: column; gap: 3px; }

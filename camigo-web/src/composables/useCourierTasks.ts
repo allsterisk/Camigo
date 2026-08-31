@@ -1,10 +1,6 @@
 import { readonly, shallowRef } from 'vue'
 
-import {
-  acceptDeliveryOrder,
-  completeDeliveryOrder,
-  getCourierTasks,
-} from '@/api/delivery-order'
+import { getCourierTasks } from '@/api/delivery-order'
 import type {
   CourierDeliveryOrder,
   CourierDeliveryOrderQuery,
@@ -17,7 +13,6 @@ export function useCourierTasks() {
   const page = shallowRef(1)
   const pageSize = shallowRef(10)
   const loading = shallowRef(false)
-  const actionOrderId = shallowRef<number | null>(null)
   const errorMessage = shallowRef('')
   let loadVersion = 0
 
@@ -42,43 +37,13 @@ export function useCourierTasks() {
     }
   }
 
-  async function accept(orderId: number): Promise<boolean> {
-    return runAction(orderId, () => acceptDeliveryOrder(orderId), '接单失败')
-  }
-
-  async function complete(orderId: number): Promise<boolean> {
-    return runAction(orderId, () => completeDeliveryOrder(orderId), '更新配送状态失败')
-  }
-
-  async function runAction(
-    orderId: number,
-    action: () => Promise<CourierDeliveryOrder>,
-    fallbackMessage: string,
-  ): Promise<boolean> {
-    if (actionOrderId.value !== null) return false
-    actionOrderId.value = orderId
-    errorMessage.value = ''
-    try {
-      await action()
-      return true
-    } catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, fallbackMessage)
-      return false
-    } finally {
-      actionOrderId.value = null
-    }
-  }
-
   return {
     tasks: readonly(tasks),
     total: readonly(total),
     page: readonly(page),
     pageSize: readonly(pageSize),
     loading: readonly(loading),
-    actionOrderId: readonly(actionOrderId),
     errorMessage: readonly(errorMessage),
     load,
-    accept,
-    complete,
   }
 }

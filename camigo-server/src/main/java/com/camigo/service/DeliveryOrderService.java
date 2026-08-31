@@ -4,6 +4,7 @@ import com.camigo.common.PageResult;
 import com.camigo.dto.DeliveryOrderCreateDTO;
 import com.camigo.dto.DeliveryOrderStatusDTO;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.CourierTaskVO;
 import com.camigo.vo.UserDeliveryOrderVO;
 
 /**
@@ -13,7 +14,7 @@ public interface DeliveryOrderService {
 
     DeliveryOrderVO create(Long userId, DeliveryOrderCreateDTO request);
 
-    PageResult<DeliveryOrderVO> listTasks(Long userId, long page, long pageSize, String status);
+    PageResult<CourierTaskVO> listTasks(Long userId, long page, long pageSize, String status);
 
     PageResult<UserDeliveryOrderVO> listMy(
             Long userId, long page, long pageSize, String status, Boolean evaluated);

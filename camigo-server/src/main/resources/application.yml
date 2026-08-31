@@ -47,6 +47,25 @@ camigo:
   jwt:
     secret: ${JWT_SECRET}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:30}
+  routing:
+    speed-kilometers-per-hour: ${CAMIGO_ROUTE_SPEED_KMH:5}
+    station-base-seconds: ${CAMIGO_STATION_BASE_SECONDS:120}
+    pickup-per-parcel-seconds: ${CAMIGO_PICKUP_PER_PARCEL_SECONDS:30}
+    destination-base-seconds: ${CAMIGO_DESTINATION_BASE_SECONDS:30}
+    storage-per-parcel-seconds: ${CAMIGO_STORAGE_PER_PARCEL_SECONDS:60}
+    max-active-orders: ${CAMIGO_MAX_ACTIVE_ORDERS:8}
+    algorithm-version: ${CAMIGO_ROUTE_ALGORITHM_VERSION:dijkstra-insertion-v1}
+  dispatch:
+    offer-seconds: ${CAMIGO_DISPATCH_OFFER_SECONDS:180}
+    rejection-window-minutes: ${CAMIGO_DISPATCH_REJECTION_WINDOW_MINUTES:10}
+    rejection-threshold: ${CAMIGO_DISPATCH_REJECTION_THRESHOLD:3}
+    cooldown-minutes: ${CAMIGO_DISPATCH_COOLDOWN_MINUTES:15}
+    distance-weight-percent: ${CAMIGO_DISPATCH_DISTANCE_WEIGHT_PERCENT:40}
+    workload-weight-percent: ${CAMIGO_DISPATCH_WORKLOAD_WEIGHT_PERCENT:35}
+    service-weight-percent: ${CAMIGO_DISPATCH_SERVICE_WEIGHT_PERCENT:25}
+    distance-scale-meters: ${CAMIGO_DISPATCH_DISTANCE_SCALE_METERS:500}
+    algorithm-version: ${CAMIGO_DISPATCH_ALGORITHM_VERSION:dispatch-score-v1}
+    scheduler-delay-ms: ${CAMIGO_DISPATCH_SCHEDULER_DELAY_MS:5000}
 
 logging:
   level:

@@ -14,6 +14,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.camigo.common.PageResult;
 import com.camigo.dto.DeliveryOrderCreateDTO;
 import com.camigo.dto.DeliveryOrderStatusDTO;
+import com.camigo.dispatch.IntelligentDispatchService;
 import com.camigo.entity.CampusLocation;
 import com.camigo.entity.Courier;
 import com.camigo.entity.DeliveryOrder;
@@ -27,6 +28,7 @@ import com.camigo.mapper.ParcelMapper;
 import com.camigo.mapper.UserMapper;
 import com.camigo.service.impl.DeliveryOrderServiceImpl;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.CourierTaskVO;
 import com.camigo.vo.UserDeliveryOrderVO;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,6 +56,8 @@ class DeliveryOrderServiceImplTest {
     private UserMapper userMapper;
     @Mock
     private ParcelLifecycleService parcelLifecycleService;
+    @Mock
+    private IntelligentDispatchService dispatchService;
 
     private DeliveryOrderServiceImpl service;
 
@@ -65,7 +69,7 @@ class DeliveryOrderServiceImplTest {
         TableInfoHelper.initTableInfo(assistant, ParcelEntity.class);
         TableInfoHelper.initTableInfo(assistant, Courier.class);
         service = new DeliveryOrderServiceImpl(orderMapper, parcelMapper, courierMapper,
-                locationMapper, userMapper, parcelLifecycleService);
+                locationMapper, userMapper, parcelLifecycleService, dispatchService);
     }
 
     @Test
@@ -76,7 +80,13 @@ class DeliveryOrderServiceImplTest {
         CampusLocation location = new CampusLocation();
         location.setId(9L);
         location.setStatus("ACTIVE");
+        location.setDeliveryEnabled(1);
         when(locationMapper.selectById(9L)).thenReturn(location);
+        CampusLocation pickup = new CampusLocation();
+        pickup.setId(25L);
+        pickup.setStatus("ACTIVE");
+        pickup.setPickupEnabled(1);
+        when(locationMapper.selectById(25L)).thenReturn(pickup);
         when(orderMapper.insert(any(DeliveryOrder.class))).thenAnswer(invocation -> {
             DeliveryOrder order = invocation.getArgument(0);
             order.setId(5L);
@@ -84,12 +94,13 @@ class DeliveryOrderServiceImplTest {
         });
 
         DeliveryOrderVO result = service.create(7L,
-                new DeliveryOrderCreateDTO(10L, null, "NORMAL", 30));
+                new DeliveryOrderCreateDTO(10L, null, "NORMAL", 30, 25L));
 
         assertThat(result.id()).isEqualTo(5L);
         assertThat(result.status()).isEqualTo("WAITING");
         verify(parcelLifecycleService).changeStatus(eq(parcel), eq("WAITING_ASSIGNMENT"),
                 eq(7L), eq("USER"), any());
+        verify(dispatchService).startDispatch(5L);
     }
 
     @Test
@@ -97,7 +108,7 @@ class DeliveryOrderServiceImplTest {
         when(userMapper.selectRoleCodes(1L)).thenReturn(List.of("ADMIN"));
 
         assertThatThrownBy(() -> service.create(1L,
-                new DeliveryOrderCreateDTO(10L, null, "NORMAL", 30)))
+                new DeliveryOrderCreateDTO(10L, null, "NORMAL", 30, 25L)))
                 .isInstanceOf(ForbiddenException.class);
     }
 
@@ -105,13 +116,16 @@ class DeliveryOrderServiceImplTest {
     void shouldListAvailableAndOwnTasksWithPublicStatuses() {
         when(userMapper.selectRoleCodes(8L)).thenReturn(List.of("COURIER"));
         when(courierMapper.selectOne(any())).thenReturn(courier());
-        Page<DeliveryOrder> page = new Page<>(1, 20, 2);
-        page.setRecords(List.of(order("CREATED", null), order("ACCEPTED", 3L)));
-        when(orderMapper.selectPage(any(Page.class), any())).thenReturn(page);
+        Page<CourierTaskVO> page = new Page<>(1, 20, 2);
+        page.setRecords(List.of(task("CREATED"), task("ACCEPTED")));
+        when(orderMapper.selectCourierTasks(any(Page.class), eq(3L),
+                eq(Set.of("CREATED", "ASSIGNING", "ASSIGNED", "ACCEPTED",
+                        "PICKING_UP", "IN_TRANSIT", "ARRIVED", "COMPLETED"))))
+                .thenReturn(page);
 
-        List<DeliveryOrderVO> result = service.listTasks(8L, 1, 20, null).records();
+        List<CourierTaskVO> result = service.listTasks(8L, 1, 20, null).records();
 
-        assertThat(result).extracting(DeliveryOrderVO::status)
+        assertThat(result).extracting(CourierTaskVO::status)
                 .containsExactly("WAITING", "PROCESSING");
     }
 
@@ -150,78 +164,47 @@ class DeliveryOrderServiceImplTest {
     @Test
     void shouldAcceptAvailableOrderAndStartParcelDelivery() {
         when(userMapper.selectRoleCodes(8L)).thenReturn(List.of("COURIER"));
-        Courier courier = courier();
-        when(courierMapper.selectByUserIdForUpdate(8L)).thenReturn(courier);
-        DeliveryOrder order = order("CREATED", null);
-        when(orderMapper.selectByIdForUpdate(5L)).thenReturn(order);
-        when(orderMapper.selectCount(any())).thenReturn(0L);
-        when(orderMapper.update(eq(null), any())).thenReturn(1);
-        ParcelEntity parcel = parcel("WAITING_ASSIGNMENT");
-        when(parcelMapper.selectById(10L)).thenReturn(parcel);
+        DeliveryOrder order = order("ACCEPTED", 3L);
+        order.setAcceptedTime(LocalDateTime.now());
+        when(dispatchService.acceptCurrentOffer(8L, 5L)).thenReturn(order);
 
         DeliveryOrderVO result = service.accept(8L, 5L);
 
         assertThat(result.status()).isEqualTo("PROCESSING");
         assertThat(result.assignedCourierId()).isEqualTo(3L);
-        verify(parcelLifecycleService).changeStatus(parcel, "DELIVERING", 8L,
-                "COURIER", "配送员接单 DO202608030001");
+        verify(dispatchService).acceptCurrentOffer(8L, 5L);
     }
 
     @Test
     void shouldRejectAcceptWhenCourierCapacityReached() {
         when(userMapper.selectRoleCodes(8L)).thenReturn(List.of("COURIER"));
-        Courier courier = courier();
-        courier.setMaxActiveOrders(1);
-        when(courierMapper.selectByUserIdForUpdate(8L)).thenReturn(courier);
-        when(orderMapper.selectByIdForUpdate(5L)).thenReturn(order("CREATED", null));
-        when(orderMapper.selectCount(any())).thenReturn(1L);
+        when(dispatchService.acceptCurrentOffer(8L, 5L))
+                .thenThrow(new BusinessException(43005, "当前订单没有有效邀请"));
 
         assertThatThrownBy(() -> service.accept(8L, 5L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("上限");
+                .hasMessageContaining("有效邀请");
         verify(orderMapper, never()).update(any(), any());
     }
 
     @Test
-    void shouldCompleteOwnProcessingOrderAndReleaseIdleCourier() {
+    void shouldRejectLegacyGenericStatusUpdate() {
         when(userMapper.selectRoleCodes(8L)).thenReturn(List.of("COURIER"));
-        Courier courier = courier();
-        courier.setAvailabilityStatus("BUSY");
-        when(courierMapper.selectByUserIdForUpdate(8L)).thenReturn(courier);
-        when(orderMapper.selectByIdForUpdate(5L)).thenReturn(order("IN_TRANSIT", 3L));
-        when(orderMapper.update(eq(null), any())).thenReturn(1);
-        when(orderMapper.selectCount(any())).thenReturn(0L);
-
-        DeliveryOrderVO result = service.updateStatus(
-                8L, 5L, new DeliveryOrderStatusDTO("DELIVERED"));
-
-        assertThat(result.status()).isEqualTo("DELIVERED");
-        assertThat(result.completedTime()).isNotNull();
-        verify(courierMapper).update(eq(null), any());
-        verify(parcelLifecycleService, never()).changeStatus(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void shouldRejectUpdatingAnotherCouriersOrder() {
-        when(userMapper.selectRoleCodes(8L)).thenReturn(List.of("COURIER"));
-        when(courierMapper.selectByUserIdForUpdate(8L)).thenReturn(courier());
-        when(orderMapper.selectByIdForUpdate(5L)).thenReturn(order("ACCEPTED", 4L));
-
         assertThatThrownBy(() -> service.updateStatus(
                 8L, 5L, new DeliveryOrderStatusDTO("DELIVERED")))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> {
+                            assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
+                            assertThat(ex.getMessage()).contains("确认取件");
+                        });
+        verify(orderMapper, never()).update(any(), any());
     }
 
-    @Test
-    void shouldReturnBadRequestForBackwardPublicTransition() {
-        when(userMapper.selectRoleCodes(8L)).thenReturn(List.of("COURIER"));
-        when(courierMapper.selectByUserIdForUpdate(8L)).thenReturn(courier());
-        when(orderMapper.selectByIdForUpdate(5L)).thenReturn(order("ACCEPTED", 3L));
-
-        assertThatThrownBy(() -> service.updateStatus(
-                8L, 5L, new DeliveryOrderStatusDTO("WAITING")))
-                .isInstanceOfSatisfying(BusinessException.class,
-                        ex -> assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+    private CourierTaskVO task(String executionStatus) {
+        return new CourierTaskVO(5L, "DO001", 10L, "SF123", "SF", 25L,
+                "食堂北快递服务站", 9L, "一号学生公寓", 3L, "M",
+                new java.math.BigDecimal("1.250"), executionStatus, executionStatus,
+                2, LocalDateTime.now().plusMinutes(10), null, null, null, null);
     }
 
     private Courier courier() {

@@ -1,5 +1,5 @@
 import { readonly, shallowRef } from 'vue'
-import { getAdminParcels, updateAdminParcelStatus } from '@/api/admin'
+import { getAdminParcels, startAdminParcelDelivery, updateAdminParcelStatus } from '@/api/admin'
 import type { AdminParcelQuery } from '@/types/admin'
 import type { Parcel } from '@/types/parcel'
 import { getRequestErrorMessage } from '@/utils/request'
@@ -23,6 +23,14 @@ export function useAdminParcels() {
     catch (error) { errorMessage.value = getRequestErrorMessage(error, '快递状态更新失败'); return false }
     finally { actionId.value = null }
   }
+  async function startDelivery(id: number) {
+    if (actionId.value !== null) return false
+    actionId.value = id
+    errorMessage.value = ''
+    try { await startAdminParcelDelivery(id); return true }
+    catch (error) { errorMessage.value = getRequestErrorMessage(error, '新一轮智能派单启动失败'); return false }
+    finally { actionId.value = null }
+  }
   return { records: readonly(records), total: readonly(total), loading: readonly(loading),
-    actionId: readonly(actionId), errorMessage: readonly(errorMessage), load, changeStatus }
+    actionId: readonly(actionId), errorMessage: readonly(errorMessage), load, changeStatus, startDelivery }
 }

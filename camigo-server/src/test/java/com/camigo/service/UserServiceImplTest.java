@@ -13,11 +13,13 @@ import com.camigo.dto.UserLoginDTO;
 import com.camigo.dto.UserRegisterDTO;
 import com.camigo.dto.UserUpdateDTO;
 import com.camigo.entity.Role;
+import com.camigo.entity.Courier;
 import com.camigo.entity.User;
 import com.camigo.entity.UserRole;
 import com.camigo.exception.BusinessException;
 import com.camigo.exception.ForbiddenException;
 import com.camigo.mapper.RoleMapper;
+import com.camigo.mapper.CourierMapper;
 import com.camigo.mapper.UserMapper;
 import com.camigo.mapper.UserRoleMapper;
 import com.camigo.service.impl.UserServiceImpl;
@@ -45,6 +47,8 @@ class UserServiceImplTest {
     @Mock
     private UserRoleMapper userRoleMapper;
     @Mock
+    private CourierMapper courierMapper;
+    @Mock
     private PasswordUtil passwordUtil;
     @Mock
     private JwtUtil jwtUtil;
@@ -56,7 +60,9 @@ class UserServiceImplTest {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "user-test");
         TableInfoHelper.initTableInfo(assistant, User.class);
         TableInfoHelper.initTableInfo(assistant, Role.class);
-        service = new UserServiceImpl(userMapper, roleMapper, userRoleMapper, passwordUtil, jwtUtil);
+        TableInfoHelper.initTableInfo(assistant, Courier.class);
+        service = new UserServiceImpl(userMapper, roleMapper, userRoleMapper,
+                courierMapper, passwordUtil, jwtUtil);
     }
 
     @Test
@@ -110,6 +116,26 @@ class UserServiceImplTest {
         assertThat(result.tokenType()).isEqualTo("Bearer");
         assertThat(result.accessToken()).isEqualTo("signed.jwt.token");
         assertThat(result.user().id()).isEqualTo(11L);
+        assertThat(result.locationConfirmed()).isTrue();
+    }
+
+    @Test
+    void shouldRequireCourierToConfirmLocationAfterEveryLogin() {
+        User user = loginUser("ACTIVE");
+        Courier courier = new Courier();
+        courier.setId(3L);
+        courier.setUserId(11L);
+        courier.setAvailabilityStatus("AVAILABLE");
+        when(userMapper.selectByAccount("camigo_user")).thenReturn(user);
+        when(passwordUtil.matches("Camigo@123", "bcrypt-hash")).thenReturn(true);
+        when(userMapper.selectRoleCodes(11L)).thenReturn(List.of("COURIER"));
+        when(courierMapper.selectByUserIdForUpdate(11L)).thenReturn(courier);
+        when(jwtUtil.createToken(11L)).thenReturn("signed.jwt.token");
+
+        LoginVO result = service.login(new UserLoginDTO("camigo_user", "Camigo@123"));
+
+        assertThat(result.locationConfirmed()).isFalse();
+        verify(courierMapper).update(any(), any());
     }
 
     @Test

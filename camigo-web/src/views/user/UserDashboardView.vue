@@ -17,7 +17,7 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="STUDENT CENTER" title="我的快递概览" description="查看包裹数量、待取件提醒与最新配送状态。" refreshable :refreshing="loading" @refresh="load" />
+    <PageHeader title="我的快递概览" description="查看包裹数量、待取件提醒与最新配送状态。" refreshable :refreshing="loading" @refresh="load" />
     <DashboardSummary :items="summaryItems" />
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" show-icon />
     <LoadingState v-else-if="loading && recentParcels.length === 0" />

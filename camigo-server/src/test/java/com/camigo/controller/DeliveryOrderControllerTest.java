@@ -17,6 +17,7 @@ import com.camigo.exception.GlobalExceptionHandler;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.DeliveryOrderService;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.CourierTaskVO;
 import com.camigo.vo.UserDeliveryOrderVO;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -56,6 +57,7 @@ class DeliveryOrderControllerTest {
                         .content("""
                                 {
                                   "parcelId":10,
+                                  "pickupLocationId":25,
                                   "priority":"NORMAL",
                                   "predictedMinutes":30
                                 }
@@ -68,7 +70,7 @@ class DeliveryOrderControllerTest {
     @Test
     void shouldListCourierTasks() throws Exception {
         when(deliveryOrderService.listTasks(8L, 1L, 20L, "WAITING"))
-                .thenReturn(new PageResult<>(List.of(order("WAITING")), 1, 1, 20));
+                .thenReturn(new PageResult<>(List.of(task("WAITING", "ASSIGNING")), 1, 1, 20));
 
         mockMvc.perform(get("/api/delivery-orders/tasks")
                         .requestAttr(LoginInterceptor.CURRENT_USER_ID, 8L)
@@ -134,7 +136,15 @@ class DeliveryOrderControllerTest {
     }
 
     private DeliveryOrderVO order(String status) {
-        return new DeliveryOrderVO(5L, "DO202608030001", 10L, 9L, 3L,
-                "NORMAL", status, 30, null, null, null, null);
+        return new DeliveryOrderVO(5L, "DO202608030001", 10L, 25L, 9L, 3L,
+                "NORMAL", status, "DELIVERED".equals(status) ? "COMPLETED" : "ACCEPTED",
+                30, null, null, null, null);
+    }
+
+    private CourierTaskVO task(String status, String executionStatus) {
+        return new CourierTaskVO(5L, "DO202608030001", 10L, "SF123456", "SF",
+                25L, "食堂北快递服务站", 9L, "一号学生公寓", 3L,
+                "M", new java.math.BigDecimal("1.250"), status, executionStatus,
+                2, LocalDateTime.now().plusMinutes(10), null, null, null, null);
     }
 }

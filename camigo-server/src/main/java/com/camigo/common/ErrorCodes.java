@@ -21,6 +21,10 @@ public final class ErrorCodes {
     public static final int DELIVERY_CONFLICT = 43002;
     public static final int DELIVERY_STATUS_INVALID = 43003;
     public static final int COURIER_NOT_FOUND = 43004;
+    public static final int DISPATCH_CONFLICT = 43005;
+    public static final int DISPATCH_OFFER_EXPIRED = 43006;
+    public static final int COURIER_LOCATION_REQUIRED = 43007;
+    public static final int ROUTE_STEP_CONFLICT = 43008;
 
     public static final int LOCKER_NOT_FOUND = 44001;
     public static final int SLOT_NOT_AVAILABLE = 44002;

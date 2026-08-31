@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -136,6 +137,20 @@ class ParcelServiceImplTest {
                 .isInstanceOfSatisfying(BusinessException.class,
                         ex -> assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
                 .hasMessageContaining("入柜");
+    }
+
+    @Test
+    void shouldRejectDirectDeliveringTransition() {
+        ParcelEntity parcel = parcel(20L, 7L, "WAITING_ASSIGNMENT");
+        when(parcelMapper.selectById(20L)).thenReturn(parcel);
+        when(userMapper.selectRoleCodes(1L)).thenReturn(List.of("ADMIN"));
+
+        assertThatThrownBy(() -> service.updateStatus(1L, 20L,
+                new ParcelStatusUpdateDTO("DELIVERING", null)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+                .hasMessageContaining("接受派单");
+        verify(lifecycleService, never()).changeStatus(any(), any(), any(), any(), any());
     }
 
     @Test

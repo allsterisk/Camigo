@@ -141,6 +141,10 @@ public class ParcelServiceImpl implements ParcelService {
         Set<String> roles = rolesOf(userId);
         String targetStatus = request.status().trim().toUpperCase();
 
+        if ("EXCEPTION".equals(parcel.getCurrentStatus())) {
+            throw invalidStatus("异常包裹只能由管理员通过异常处理接口恢复或确认退回");
+        }
+
         if ("COMPLETED".equals(targetStatus)) {
             boolean owner = parcel.getRecipientUserId().equals(userId) && roles.contains(USER_ROLE);
             if (!owner && !roles.contains(ADMIN_ROLE)) {
@@ -161,15 +165,14 @@ public class ParcelServiceImpl implements ParcelService {
                 && !isAssignedCourier(userId, parcelId)) {
             throw new ForbiddenException("不能更新其他配送员任务中的快递");
         }
-        String sourceType = roles.contains(ADMIN_ROLE) ? ADMIN_ROLE : COURIER_ROLE;
-
         switch (targetStatus) {
             case "ARRIVED" -> {
                 if (!PUBLIC_TO_INTERNAL_STATUSES.get("ARRIVED").contains(parcel.getCurrentStatus())) {
                     throw invalidStatus("快递不能回退到已到校状态");
                 }
             }
-            case "DELIVERING" -> moveToDelivering(parcel, userId, sourceType, request.remark());
+            case "DELIVERING" -> throw invalidStatus(
+                    "快递只能在配送员接受派单后进入配送中，请使用开始配送启动智能派单");
             case "STORED" -> throw invalidStatus("快递入柜请使用快递柜入柜接口");
             case "PICKED" -> throw invalidStatus("用户取件请使用快递柜取件接口");
             default -> throw invalidStatus("不支持的快递状态");
@@ -204,7 +207,12 @@ public class ParcelServiceImpl implements ParcelService {
         applyPublicStatusFilter(query, status);
 
         Page<ParcelEntity> result = parcelMapper.selectPage(new Page<>(page, pageSize), query);
-        List<ParcelVO> records = result.getRecords().stream().map(this::toVo).toList();
+        List<Long> parcelIds = result.getRecords().stream().map(ParcelEntity::getId).toList();
+        Set<Long> startAvailableIds = parcelIds.isEmpty() ? Set.of() : Set.copyOf(
+                deliveryOrderMapper.selectDeliveryStartAvailableParcelIds(parcelIds));
+        List<ParcelVO> records = result.getRecords().stream()
+                .map(parcel -> toVo(parcel, startAvailableIds.contains(parcel.getId())))
+                .toList();
         return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
     }
 
@@ -217,21 +225,6 @@ public class ParcelServiceImpl implements ParcelService {
             throw invalidStatus("不支持的快递状态筛选条件");
         }
         query.in(ParcelEntity::getCurrentStatus, PUBLIC_TO_INTERNAL_STATUSES.get(normalized));
-    }
-
-    private void moveToDelivering(ParcelEntity parcel, Long userId, String sourceType, String remark) {
-        String current = parcel.getCurrentStatus();
-        if ("DELIVERING".equals(current)) {
-            return;
-        }
-        if ("REGISTERED".equals(current) || "SORTING".equals(current)) {
-            lifecycleService.changeStatus(parcel, "WAITING_ASSIGNMENT", userId,
-                    sourceType, "进入待配送状态");
-        }
-        if (!"WAITING_ASSIGNMENT".equals(parcel.getCurrentStatus())) {
-            throw invalidStatus("当前快递状态不能开始配送");
-        }
-        lifecycleService.changeStatus(parcel, "DELIVERING", userId, sourceType, remark);
     }
 
     private User requireActiveRecipient(String phone, String receiverName) {
@@ -312,11 +305,21 @@ public class ParcelServiceImpl implements ParcelService {
     }
 
     private ParcelVO toVo(ParcelEntity parcel) {
+        Long orderId = deliveryOrderMapper.selectLatestIdByParcelId(parcel.getId());
+        DeliveryOrder order = orderId == null ? null : deliveryOrderMapper.selectById(orderId);
+        boolean startAvailable = order != null && ("CREATED".equals(order.getStatus())
+                || ("ASSIGNING".equals(order.getStatus())
+                    && Integer.valueOf(1).equals(order.getManualDispatchRequired())));
+        return toVo(parcel, startAvailable);
+    }
+
+    private ParcelVO toVo(ParcelEntity parcel, boolean deliveryStartAvailable) {
         return new ParcelVO(parcel.getId(), parcel.getTrackingNo(), parcel.getCarrierCode(),
                 parcel.getRecipientUserId(), parcel.getSenderName(), parcel.getSenderPhoneMasked(),
                 parcel.getDestinationLocationId(), parcel.getTargetLockerId(), parcel.getSizeClass(),
-                parcel.getWeightKg(), toPublicStatus(parcel.getCurrentStatus()), parcel.getArriveTime(),
-                parcel.getCreateTime(), parcel.getUpdateTime());
+                parcel.getWeightKg(), toPublicStatus(parcel.getCurrentStatus()),
+                deliveryStartAvailable, parcel.getArriveTime(), parcel.getCreateTime(),
+                parcel.getUpdateTime());
     }
 
     private String toPublicStatus(String internalStatus) {

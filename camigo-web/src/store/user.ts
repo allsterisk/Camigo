@@ -14,6 +14,7 @@ interface PersistedSession {
   token: string
   role: UserRole
   userInfo: UserInfo
+  locationConfirmed: boolean
 }
 
 const SESSION_KEY = 'camigo.session'
@@ -23,6 +24,7 @@ export const useUserStore = defineStore('user', () => {
   const token = shallowRef(session?.token ?? '')
   const role = shallowRef<UserRole | null>(session?.role ?? null)
   const userInfo = shallowRef<UserInfo | null>(session?.userInfo ?? null)
+  const locationConfirmed = shallowRef(session?.locationConfirmed ?? true)
   const isAuthenticated = computed(() => Boolean(token.value && role.value && userInfo.value))
   const displayName = computed(() => userInfo.value?.realName || userInfo.value?.username || '')
 
@@ -34,14 +36,20 @@ export const useUserStore = defineStore('user', () => {
     const primaryRole = selectPrimaryRole(response.user.roles)
     if (!response.accessToken || !primaryRole) throw new Error('登录响应缺少有效的 Token 或角色')
 
-    setSession(response.accessToken, primaryRole, response.user)
+    setSession(response.accessToken, primaryRole, response.user, response.locationConfirmed)
     return primaryRole
   }
 
-  function setSession(nextToken: string, nextRole: UserRole, nextUserInfo: UserInfo) {
+  function setSession(
+    nextToken: string,
+    nextRole: UserRole,
+    nextUserInfo: UserInfo,
+    nextLocationConfirmed: boolean,
+  ) {
     token.value = nextToken
     role.value = nextRole
     userInfo.value = nextUserInfo
+    locationConfirmed.value = nextRole !== 'COURIER' || nextLocationConfirmed
     persistSession()
   }
 
@@ -50,16 +58,27 @@ export const useUserStore = defineStore('user', () => {
     persistSession()
   }
 
+  function markLocationConfirmed() {
+    locationConfirmed.value = true
+    persistSession()
+  }
+
   function logout() {
     token.value = ''
     role.value = null
     userInfo.value = null
+    locationConfirmed.value = true
     localStorage.removeItem(SESSION_KEY)
   }
 
   function persistSession() {
     if (!token.value || !role.value || !userInfo.value) return
-    const value: PersistedSession = { token: token.value, role: role.value, userInfo: userInfo.value }
+    const value: PersistedSession = {
+      token: token.value,
+      role: role.value,
+      userInfo: userInfo.value,
+      locationConfirmed: locationConfirmed.value,
+    }
     localStorage.setItem(SESSION_KEY, JSON.stringify(value))
   }
 
@@ -69,9 +88,11 @@ export const useUserStore = defineStore('user', () => {
     userInfo,
     isAuthenticated,
     displayName,
+    locationConfirmed,
     login,
     setSession,
     setUserInfo,
+    markLocationConfirmed,
     logout,
   }
 })
@@ -90,7 +111,12 @@ function readSession(): PersistedSession | null {
     ) {
       throw new Error('Invalid session')
     }
-    return value as PersistedSession
+    return {
+      token: value.token,
+      role: value.role,
+      userInfo: value.userInfo,
+      locationConfirmed: value.role !== 'COURIER' || value.locationConfirmed === true,
+    }
   } catch {
     localStorage.removeItem(SESSION_KEY)
     return null

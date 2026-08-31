@@ -33,7 +33,7 @@ public class ParcelLifecycleServiceImpl implements ParcelLifecycleService {
             "READY_PICKUP", Set.of("PICKED_UP", "EXCEPTION"),
             "PICKED_UP", Set.of("COMPLETED"),
             "COMPLETED", Set.of(),
-            "EXCEPTION", Set.of("SORTING", "RETURNED"),
+            "EXCEPTION", Set.of("SORTING", "DELIVERING", "RETURNED"),
             "RETURNED", Set.of());
 
     private final ParcelMapper parcelMapper;

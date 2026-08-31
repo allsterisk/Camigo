@@ -14,6 +14,7 @@ export interface Parcel {
   sizeClass: string
   weightKg: number | null
   currentStatus: ParcelStatus | string
+  deliveryStartAvailable: boolean
   arriveTime: string
   createTime: string
   updateTime: string

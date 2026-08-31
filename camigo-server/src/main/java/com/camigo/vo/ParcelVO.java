@@ -20,6 +20,7 @@ public record ParcelVO(
         @Schema(description = "包裹尺寸") String sizeClass,
         @Schema(description = "包裹重量（千克）", nullable = true) BigDecimal weightKg,
         @Schema(description = "公共快递状态") String currentStatus,
+        @Schema(description = "管理员当前是否可以开始首轮或下一轮配送") boolean deliveryStartAvailable,
         @Schema(description = "到校时间") LocalDateTime arriveTime,
         @Schema(description = "创建时间") LocalDateTime createTime,
         @Schema(description = "更新时间") LocalDateTime updateTime) {

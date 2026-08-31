@@ -1,6 +1,8 @@
 # IDE and editor metadata
 .idea/
 .vscode/
+.run/
+.codex-stage11-ppt/
 *.iml
 *.iws
 *.ipr

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import com.camigo.CamigoApplication;
 import com.camigo.mapper.DeliveryOrderMapper;
 import com.camigo.mapper.CourierMapper;
+import com.camigo.mapper.DeliveryAssignmentMapper;
 import com.camigo.mapper.EvaluationMapper;
 import com.camigo.mapper.LockerSlotMapper;
 import com.camigo.mapper.ParcelMapper;
@@ -34,6 +35,8 @@ class DatabaseMapperSmokeTest {
     @Autowired
     private CourierMapper courierMapper;
     @Autowired
+    private DeliveryAssignmentMapper deliveryAssignmentMapper;
+    @Autowired
     private LockerSlotMapper lockerSlotMapper;
     @Autowired
     private ParcelMapper parcelMapper;
@@ -52,6 +55,9 @@ class DatabaseMapperSmokeTest {
             parcelMapper.selectById(Long.MAX_VALUE);
             deliveryOrderMapper.selectByIdForUpdate(Long.MAX_VALUE);
             courierMapper.selectByUserIdForUpdate(Long.MAX_VALUE);
+            courierMapper.selectByUserId(Long.MAX_VALUE);
+            deliveryAssignmentMapper.selectSnapshotById(Long.MAX_VALUE);
+            deliveryAssignmentMapper.selectExpiredOfferIds(LocalDateTime.now(), 10);
             lockerSlotMapper.selectByIdForUpdate(Long.MAX_VALUE);
             storageRecordMapper.selectByIdForUpdate(Long.MAX_VALUE);
             evaluationMapper.selectCourierAverageRating(Long.MAX_VALUE);

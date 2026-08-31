@@ -9,6 +9,7 @@ declare module 'vue-router' {
     guestOnly?: boolean
     requiresAuth?: boolean
     roles?: UserRole[]
+    allowsUnconfirmedLocation?: boolean
     title?: string
   }
 }

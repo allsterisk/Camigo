@@ -1,6 +1,6 @@
 import { shallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import { useUserStore } from '@/store/user'
 import { ROLE_HOME, type LoginCredentials, type UserRole } from '@/types/auth'
@@ -29,8 +29,14 @@ export function useLogin() {
     }
   }
 
-  function resolveDestination(role: UserRole): string {
+  function resolveDestination(role: UserRole): RouteLocationRaw {
     const redirect = route.query.redirect
+    if (role === 'COURIER' && !userStore.locationConfirmed) {
+      return {
+        name: 'courier-location-confirm',
+        query: typeof redirect === 'string' ? { redirect } : undefined,
+      }
+    }
     if (typeof redirect !== 'string' || !redirect.startsWith('/') || redirect.startsWith('//')) {
       return ROLE_HOME[role]
     }

@@ -9,12 +9,14 @@ import com.camigo.dto.UserLoginDTO;
 import com.camigo.dto.UserRegisterDTO;
 import com.camigo.dto.UserUpdateDTO;
 import com.camigo.entity.Role;
+import com.camigo.entity.Courier;
 import com.camigo.entity.User;
 import com.camigo.entity.UserRole;
 import com.camigo.exception.BusinessException;
 import com.camigo.exception.ForbiddenException;
 import com.camigo.exception.ResourceNotFoundException;
 import com.camigo.mapper.RoleMapper;
+import com.camigo.mapper.CourierMapper;
 import com.camigo.mapper.UserMapper;
 import com.camigo.mapper.UserRoleMapper;
 import com.camigo.service.UserService;
@@ -51,17 +53,20 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
+    private final CourierMapper courierMapper;
     private final PasswordUtil passwordUtil;
     private final JwtUtil jwtUtil;
 
     public UserServiceImpl(UserMapper userMapper,
                            RoleMapper roleMapper,
                            UserRoleMapper userRoleMapper,
+                           CourierMapper courierMapper,
                            PasswordUtil passwordUtil,
                            JwtUtil jwtUtil) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
+        this.courierMapper = courierMapper;
         this.passwordUtil = passwordUtil;
         this.jwtUtil = jwtUtil;
     }
@@ -132,9 +137,21 @@ public class UserServiceImpl implements UserService {
                 .eq(User::getId, user.getId())
                 .set(User::getLastLoginTime, LocalDateTime.now()));
         List<String> roles = userMapper.selectRoleCodes(user.getId());
+        boolean locationConfirmed = true;
+        if (roles != null && roles.contains("COURIER")) {
+            Courier courier = courierMapper.selectByUserIdForUpdate(user.getId());
+            if (courier == null) {
+                throw new BusinessException(ErrorCodes.COURIER_NOT_FOUND,
+                        "配送员档案不存在", HttpStatus.NOT_FOUND);
+            }
+            courierMapper.update(null, new LambdaUpdateWrapper<Courier>()
+                    .eq(Courier::getId, courier.getId())
+                    .set(Courier::getAvailabilityStatus, "OFFLINE"));
+            locationConfirmed = false;
+        }
         String token = jwtUtil.createToken(user.getId());
         logger.info("User login succeeded, userId={}", user.getId());
-        return new LoginVO("Bearer", token, toUserInfo(user, roles));
+        return new LoginVO("Bearer", token, toUserInfo(user, roles), locationConfirmed);
     }
 
     @Override

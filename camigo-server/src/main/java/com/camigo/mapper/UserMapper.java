@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.camigo.entity.User;
 import com.camigo.vo.AdminUserVO;
+import com.camigo.vo.AdminStudentOptionVO;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -60,4 +61,16 @@ public interface UserMapper extends BaseMapper<User> {
                                       @Param("keyword") String keyword,
                                       @Param("status") String status,
                                       @Param("role") String role);
+
+    @Select("""
+            SELECT u.id, u.real_name, u.student_no, u.phone
+            FROM users u
+            WHERE u.status = 'ACTIVE'
+              AND EXISTS (
+                SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                WHERE ur.user_id = u.id AND r.role_code = 'USER' AND r.status = 'ENABLED'
+              )
+            ORDER BY u.real_name, u.student_no, u.id
+            """)
+    List<AdminStudentOptionVO> selectActiveStudentOptions();
 }

@@ -7,6 +7,7 @@ import com.camigo.common.ErrorCodes;
 import com.camigo.common.PageResult;
 import com.camigo.dto.DeliveryOrderCreateDTO;
 import com.camigo.dto.DeliveryOrderStatusDTO;
+import com.camigo.dispatch.IntelligentDispatchService;
 import com.camigo.entity.CampusLocation;
 import com.camigo.entity.Courier;
 import com.camigo.entity.DeliveryOrder;
@@ -22,6 +23,7 @@ import com.camigo.mapper.UserMapper;
 import com.camigo.service.DeliveryOrderService;
 import com.camigo.service.ParcelLifecycleService;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.CourierTaskVO;
 import com.camigo.vo.UserDeliveryOrderVO;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -65,19 +67,22 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
     private final CampusLocationMapper locationMapper;
     private final UserMapper userMapper;
     private final ParcelLifecycleService parcelLifecycleService;
+    private final IntelligentDispatchService dispatchService;
 
     public DeliveryOrderServiceImpl(DeliveryOrderMapper orderMapper,
                                     ParcelMapper parcelMapper,
                                     CourierMapper courierMapper,
                                     CampusLocationMapper locationMapper,
                                     UserMapper userMapper,
-                                    ParcelLifecycleService parcelLifecycleService) {
+                                    ParcelLifecycleService parcelLifecycleService,
+                                    IntelligentDispatchService dispatchService) {
         this.orderMapper = orderMapper;
         this.parcelMapper = parcelMapper;
         this.courierMapper = courierMapper;
         this.locationMapper = locationMapper;
         this.userMapper = userMapper;
         this.parcelLifecycleService = parcelLifecycleService;
+        this.dispatchService = dispatchService;
     }
 
     @Override
@@ -102,13 +107,20 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
                     HttpStatus.BAD_REQUEST);
         }
         CampusLocation location = locationMapper.selectById(destinationId);
-        if (location == null || !"ACTIVE".equals(location.getStatus())) {
+        if (location == null || !"ACTIVE".equals(location.getStatus())
+                || !Integer.valueOf(1).equals(location.getDeliveryEnabled())) {
             throw new ResourceNotFoundException("配送目的地不存在或已停用");
+        }
+        CampusLocation pickupLocation = locationMapper.selectById(request.pickupLocationId());
+        if (pickupLocation == null || !"ACTIVE".equals(pickupLocation.getStatus())
+                || !Integer.valueOf(1).equals(pickupLocation.getPickupEnabled())) {
+            throw new ResourceNotFoundException("取件服务站不存在或已停用");
         }
 
         DeliveryOrder order = new DeliveryOrder();
         order.setOrderNo(generateOrderNo());
         order.setParcelId(parcel.getId());
+        order.setPickupLocationId(pickupLocation.getId());
         order.setDestinationLocationId(destinationId);
         order.setPriority(StringUtils.hasText(request.priority())
                 ? request.priority().trim().toUpperCase() : "NORMAL");
@@ -121,31 +133,26 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
         }
         parcelLifecycleService.changeStatus(parcel, "WAITING_ASSIGNMENT", userId,
                 USER_ROLE, "创建配送任务 " + order.getOrderNo());
+        dispatchService.startDispatch(order.getId());
         return toVo(order);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<DeliveryOrderVO> listTasks(Long userId, long page, long pageSize,
-                                                  String status) {
+    public PageResult<CourierTaskVO> listTasks(Long userId, long page, long pageSize,
+                                               String status) {
         requireRole(userId, COURIER_ROLE);
         Courier courier = requireCourier(userId);
         if (!"ACTIVE".equals(courier.getEmploymentStatus())) {
             throw new ForbiddenException("配送员账号当前不可执行配送任务");
         }
 
-        LambdaQueryWrapper<DeliveryOrder> query = new LambdaQueryWrapper<DeliveryOrder>()
-                .in(DeliveryOrder::getStatus, PUBLIC_INTERNAL_STATUSES)
-                .and(scope -> scope
-                        .isNull(DeliveryOrder::getAssignedCourierId)
-                        .in(DeliveryOrder::getStatus, WAITING_INTERNAL_STATUSES)
-                        .or()
-                        .eq(DeliveryOrder::getAssignedCourierId, courier.getId()))
-                .orderByDesc(DeliveryOrder::getCreateTime);
-        applyPublicStatusFilter(query, status);
-
-        Page<DeliveryOrder> result = orderMapper.selectPage(new Page<>(page, pageSize), query);
-        List<DeliveryOrderVO> records = result.getRecords().stream().map(this::toVo).toList();
+        Set<String> statuses = resolvePublicStatuses(status);
+        Page<CourierTaskVO> result = orderMapper.selectCourierTasks(
+                new Page<>(page, pageSize), courier.getId(), statuses);
+        List<CourierTaskVO> records = result.getRecords().stream()
+                .map(this::toCourierTaskVo)
+                .toList();
         return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
     }
 
@@ -167,55 +174,7 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
     @Transactional
     public DeliveryOrderVO accept(Long userId, Long orderId) {
         requireRole(userId, COURIER_ROLE);
-        Courier courier = requireCourierForUpdate(userId);
-        ensureCourierCanAccept(courier);
-        DeliveryOrder order = requireLockedOrder(orderId);
-
-        if ("ACCEPTED".equals(order.getStatus())
-                && courier.getId().equals(order.getAssignedCourierId())) {
-            return toVo(order);
-        }
-        if (!WAITING_INTERNAL_STATUSES.contains(order.getStatus())) {
-            throw invalidStatus("当前配送任务不可接单");
-        }
-        if (order.getAssignedCourierId() != null
-                && !courier.getId().equals(order.getAssignedCourierId())) {
-            throw new BusinessException(ErrorCodes.DELIVERY_CONFLICT, "配送任务已分配给其他配送员");
-        }
-        ensureCourierCapacity(courier, orderId);
-
-        LocalDateTime now = LocalDateTime.now();
-        String previousStatus = order.getStatus();
-        Long previousCourierId = order.getAssignedCourierId();
-        int updated = orderMapper.update(null, new LambdaUpdateWrapper<DeliveryOrder>()
-                .eq(DeliveryOrder::getId, order.getId())
-                .eq(DeliveryOrder::getStatus, previousStatus)
-                .eq(previousCourierId != null, DeliveryOrder::getAssignedCourierId, previousCourierId)
-                .isNull(previousCourierId == null, DeliveryOrder::getAssignedCourierId)
-                .set(DeliveryOrder::getAssignedCourierId, courier.getId())
-                .set(DeliveryOrder::getStatus, "ACCEPTED")
-                .set(DeliveryOrder::getAcceptedTime, now));
-        if (updated != 1) {
-            throw new BusinessException(ErrorCodes.DELIVERY_CONFLICT, "配送任务已被其他配送员接取");
-        }
-        order.setAssignedCourierId(courier.getId());
-        order.setStatus("ACCEPTED");
-        order.setAcceptedTime(now);
-        if (!"BUSY".equals(courier.getAvailabilityStatus())) {
-            courierMapper.update(null, new LambdaUpdateWrapper<Courier>()
-                    .eq(Courier::getId, courier.getId())
-                    .set(Courier::getAvailabilityStatus, "BUSY"));
-            courier.setAvailabilityStatus("BUSY");
-        }
-
-        ParcelEntity parcel = requireParcel(order.getParcelId());
-        if ("WAITING_ASSIGNMENT".equals(parcel.getCurrentStatus())) {
-            parcelLifecycleService.changeStatus(parcel, "DELIVERING", userId,
-                    COURIER_ROLE, "配送员接单 " + order.getOrderNo());
-        } else if (!"DELIVERING".equals(parcel.getCurrentStatus())) {
-            throw invalidStatus("关联快递当前不能开始配送");
-        }
-        return toVo(order);
+        return toVo(dispatchService.acceptCurrentOffer(userId, orderId));
     }
 
     @Override
@@ -223,36 +182,9 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
     public DeliveryOrderVO updateStatus(Long userId, Long orderId,
                                         DeliveryOrderStatusDTO request) {
         requireRole(userId, COURIER_ROLE);
-        Courier courier = requireCourierForUpdate(userId);
-        DeliveryOrder order = requireLockedOrder(orderId);
-        if (!courier.getId().equals(order.getAssignedCourierId())) {
-            throw new ForbiddenException("不能修改其他配送员的任务");
-        }
-
-        String targetStatus = request.status().trim().toUpperCase();
-        String currentPublicStatus = toPublicStatus(order.getStatus());
-        if (targetStatus.equals(currentPublicStatus)) {
-            return toVo(order);
-        }
-        if (!"PROCESSING".equals(currentPublicStatus) || !"DELIVERED".equals(targetStatus)) {
-            throw invalidStatus("配送状态不能从 " + currentPublicStatus + " 变更为 " + targetStatus);
-        }
-
-        LocalDateTime completedTime = LocalDateTime.now();
-        String previousStatus = order.getStatus();
-        int updated = orderMapper.update(null, new LambdaUpdateWrapper<DeliveryOrder>()
-                .eq(DeliveryOrder::getId, order.getId())
-                .eq(DeliveryOrder::getStatus, previousStatus)
-                .eq(DeliveryOrder::getAssignedCourierId, courier.getId())
-                .set(DeliveryOrder::getStatus, "COMPLETED")
-                .set(DeliveryOrder::getCompletedTime, completedTime));
-        if (updated != 1) {
-            throw new BusinessException(ErrorCodes.DELIVERY_CONFLICT, "配送状态已被其他请求修改");
-        }
-        order.setStatus("COMPLETED");
-        order.setCompletedTime(completedTime);
-        releaseCourierWhenIdle(courier);
-        return toVo(order);
+        throw new BusinessException(ErrorCodes.DELIVERY_STATUS_INVALID,
+                "通用状态更新已停用，请使用确认取件或确认到达接口",
+                HttpStatus.CONFLICT);
     }
 
     private void applyPublicStatusFilter(LambdaQueryWrapper<DeliveryOrder> query, String status) {
@@ -299,7 +231,7 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
         Long activeCount = orderMapper.selectCount(new LambdaQueryWrapper<DeliveryOrder>()
                 .eq(DeliveryOrder::getAssignedCourierId, courier.getId())
                 .in(DeliveryOrder::getStatus, ACTIVE_COURIER_ORDER_STATUSES));
-        if (activeCount == null || activeCount == 0) {
+        if (activeCount == null || activeCount < 8) {
             courierMapper.update(null, new LambdaUpdateWrapper<Courier>()
                     .eq(Courier::getId, courier.getId())
                     .eq(Courier::getAvailabilityStatus, "BUSY")
@@ -362,9 +294,21 @@ public class DeliveryOrderServiceImpl implements DeliveryOrderService {
 
     private DeliveryOrderVO toVo(DeliveryOrder order) {
         return new DeliveryOrderVO(order.getId(), order.getOrderNo(), order.getParcelId(),
-                order.getDestinationLocationId(), order.getAssignedCourierId(), order.getPriority(),
-                toPublicStatus(order.getStatus()), order.getPredictedMinutes(), order.getAcceptedTime(),
+                order.getPickupLocationId(), order.getDestinationLocationId(),
+                order.getAssignedCourierId(), order.getPriority(),
+                toPublicStatus(order.getStatus()), order.getStatus(),
+                order.getPredictedMinutes(), order.getAcceptedTime(),
                 order.getCompletedTime(), order.getCreateTime(), order.getUpdateTime());
+    }
+
+    private CourierTaskVO toCourierTaskVo(CourierTaskVO task) {
+        return new CourierTaskVO(task.id(), task.orderNo(), task.parcelId(), task.trackingNo(),
+                task.carrierCode(), task.pickupLocationId(), task.pickupLocationName(),
+                task.destinationLocationId(), task.destinationLocationName(),
+                task.assignedCourierId(), task.sizeClass(), task.weightKg(),
+                toPublicStatus(task.executionStatus()), task.executionStatus(),
+                task.routeSequenceNo(), task.estimatedArrivalTime(), task.acceptedTime(),
+                task.completedTime(), task.createTime(), task.updateTime());
     }
 
     private String toPublicStatus(String internalStatus) {

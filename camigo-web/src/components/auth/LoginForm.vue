@@ -92,7 +92,7 @@ async function handleSubmit() {
 </template>
 
 <style scoped>
-.login-form-panel { width: min(420px, 100%); margin: auto; }
+.login-form-panel { width: 100%; max-width: 420px; min-width: 0; margin: auto; }
 .login-form-panel__header { margin-bottom: 32px; }
 .login-form-panel__eyebrow { color: #176aa6; font-size: 11px; font-weight: 800; letter-spacing: .2em; }
 .login-form-panel__title { margin: 12px 0 8px; color: #0b2f53; font-size: 34px; letter-spacing: -.03em; }

@@ -32,7 +32,6 @@ watch(currentPage, refresh, { immediate: true })
 <template>
   <div>
     <PageHeader
-      eyebrow="DELIVERY HISTORY"
       title="配送记录"
       description="按完成时间查看本人已经送达的历史配送订单。"
       refreshable
@@ -56,7 +55,11 @@ watch(currentPage, refresh, { immediate: true })
         @action="refresh"
       />
       <template v-else>
-        <CourierTaskTable :tasks="tasks" :loading="loading" />
+        <CourierTaskTable
+          :tasks="tasks"
+          :loading="loading"
+          time-column-label="完成时间"
+        />
         <el-pagination
           v-if="total > pageSize"
           class="courier-history__pagination"

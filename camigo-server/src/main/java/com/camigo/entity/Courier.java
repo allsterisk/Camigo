@@ -2,6 +2,7 @@ package com.camigo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,4 +20,6 @@ public class Courier extends BaseEntity {
     private String availabilityStatus;
     private Integer maxActiveOrders;
     private BigDecimal ratingAvg;
+    private Long currentLocationId;
+    private LocalDateTime locationUpdateTime;
 }

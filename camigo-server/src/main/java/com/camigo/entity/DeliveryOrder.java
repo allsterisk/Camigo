@@ -17,6 +17,7 @@ public class DeliveryOrder extends BaseEntity {
 
     private String orderNo;
     private Long parcelId;
+    private Long pickupLocationId;
     private Long destinationLocationId;
     private Long assignedCourierId;
     private String priority;
@@ -24,6 +25,9 @@ public class DeliveryOrder extends BaseEntity {
     private Integer predictedMinutes;
     private LocalDateTime acceptedTime;
     private LocalDateTime completedTime;
+    private Integer dispatchRound;
+    private LocalDateTime nextDispatchTime;
+    private Integer manualDispatchRequired;
 
     /** 数据库生成列，只读。 */
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)

@@ -46,6 +46,17 @@ const router = createRouter({
       ],
     },
     {
+      path: '/courier/location',
+      name: 'courier-location-confirm',
+      component: () => import('@/views/courier/CourierLocationConfirmView.vue'),
+      meta: {
+        requiresAuth: true,
+        roles: ['COURIER'],
+        allowsUnconfirmedLocation: true,
+        title: '确认当前位置',
+      },
+    },
+    {
       path: '/courier',
       component: () => import('@/layout/CourierLayout.vue'),
       meta: { requiresAuth: true, roles: ['COURIER'] },
@@ -78,6 +89,8 @@ const router = createRouter({
         { path: '', name: 'admin-dashboard', component: () => import('@/views/admin/AdminDashboardView.vue'), meta: { title: '运营概览' } },
         { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUsersView.vue'), meta: { title: '用户管理' } },
         { path: 'parcels', name: 'admin-parcels', component: () => import('@/views/admin/AdminParcelsView.vue'), meta: { title: '快递管理' } },
+        { path: 'parcels/generate', name: 'admin-parcel-generation', component: () => import('@/views/admin/AdminParcelGenerationView.vue'), meta: { title: '生成包裹' } },
+        { path: 'exceptions', name: 'admin-exceptions', component: () => import('@/views/admin/AdminExceptionsView.vue'), meta: { title: '异常处理' } },
         { path: 'couriers', name: 'admin-couriers', component: () => import('@/views/admin/AdminCouriersView.vue'), meta: { title: '配送员管理' } },
         { path: 'lockers', name: 'admin-lockers', component: () => import('@/views/admin/AdminLockersView.vue'), meta: { title: '快递柜管理' } },
       ],
@@ -95,12 +108,23 @@ router.beforeEach((to) => {
   const userStore = useUserStore(pinia)
 
   if (to.meta.guestOnly && userStore.isAuthenticated && userStore.role) {
+    if (userStore.role === 'COURIER' && !userStore.locationConfirmed) {
+      return { name: 'courier-location-confirm' }
+    }
     return ROLE_HOME[userStore.role]
   }
   if (to.meta.requiresAuth && (!userStore.isAuthenticated || !userStore.role)) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (userStore.role && !canAccess(to, userStore.role)) return ROLE_HOME[userStore.role]
+  if (userStore.role === 'COURIER') {
+    if (!userStore.locationConfirmed && !to.meta.allowsUnconfirmedLocation) {
+      return { name: 'courier-location-confirm', query: { redirect: to.fullPath } }
+    }
+    if (userStore.locationConfirmed && to.meta.allowsUnconfirmedLocation) {
+      return ROLE_HOME.COURIER
+    }
+  }
   return true
 })
 

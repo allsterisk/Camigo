@@ -7,6 +7,8 @@ import com.camigo.dto.ParcelCreateDTO;
 import com.camigo.dto.ParcelStatusUpdateDTO;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.ParcelService;
+import com.camigo.service.LockerService;
+import com.camigo.vo.ParcelPickupAccessVO;
 import com.camigo.vo.ParcelVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,9 +41,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ParcelController {
 
     private final ParcelService parcelService;
+    private final LockerService lockerService;
 
-    public ParcelController(ParcelService parcelService) {
+    public ParcelController(ParcelService parcelService, LockerService lockerService) {
         this.parcelService = parcelService;
+        this.lockerService = lockerService;
     }
 
     @Operation(summary = "管理员录入快递")
@@ -92,6 +96,15 @@ public class ParcelController {
             @Parameter(description = "快递编号", required = true)
             @PathVariable @Positive(message = "快递编号必须为正数") Long id) {
         return Result.success(parcelService.getById(userId, id));
+    }
+
+    @Operation(summary = "查询本人快递的活动取件码")
+    @RequireRoles("USER")
+    @GetMapping("/{id}/pickup-access")
+    public Result<ParcelPickupAccessVO> pickupAccess(
+            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
+            @PathVariable @Positive(message = "快递编号必须为正数") Long id) {
+        return Result.success(lockerService.getPickupAccess(userId, id));
     }
 
     @Operation(summary = "更新快递状态",

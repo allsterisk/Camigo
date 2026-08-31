@@ -28,5 +28,10 @@ public record DeliveryOrderCreateDTO(
         @Schema(description = "预计配送分钟数", example = "30", nullable = true)
         @PositiveOrZero(message = "预计时长不能为负数")
         @Max(value = 1440, message = "预计时长不能超过1440分钟")
-        Integer predictedMinutes) {
+        Integer predictedMinutes,
+
+        @Schema(description = "取件服务站编号", example = "25")
+        @NotNull(message = "取件服务站不能为空")
+        @Positive(message = "取件服务站编号必须为正数")
+        Long pickupLocationId) {
 }

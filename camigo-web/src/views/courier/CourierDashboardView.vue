@@ -6,8 +6,10 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import CourierSummary from '@/components/courier/CourierSummary.vue'
+import CourierRoutePanel from '@/components/courier/CourierRoutePanel.vue'
 import CourierTaskTable from '@/components/courier/CourierTaskTable.vue'
 import { useCourierDashboard } from '@/composables/useCourierDashboard'
+import { useCourierRoute } from '@/composables/useCourierRoute'
 
 const router = useRouter()
 const {
@@ -21,6 +23,12 @@ const {
   errorMessage,
   load,
 } = useCourierDashboard()
+const {
+  route: currentRoute,
+  loading: routeLoading,
+  errorMessage: routeError,
+  load: loadRoute,
+} = useCourierRoute()
 
 const summaryItems = computed(() => [
   {
@@ -43,20 +51,30 @@ const summaryItems = computed(() => [
   },
 ])
 
-onMounted(load)
+function refresh() {
+  return Promise.all([load(), loadRoute()])
+}
+
+onMounted(refresh)
 </script>
 
 <template>
   <div>
     <PageHeader
-      eyebrow="COURIER CENTER"
       title="配送工作概览"
       description="集中查看今日任务、完成进度与最近配送动态。"
       refreshable
       :refreshing="loading"
-      @refresh="load"
+      @refresh="refresh"
     />
     <CourierSummary :items="summaryItems" />
+    <CourierRoutePanel
+      class="courier-dashboard__route"
+      :route="currentRoute"
+      :loading="routeLoading"
+      :error-message="routeError"
+      @refresh="loadRoute"
+    />
     <el-alert
       v-if="errorMessage"
       class="courier-dashboard__error"
@@ -79,8 +97,8 @@ onMounted(load)
       <EmptyState
         v-if="recentTasks.length === 0"
         title="暂无配送任务"
-        description="出现可接任务后，可以前往任务中心接单。"
-        action-label="查看可接任务"
+        description="收到派单邀请后，可以前往任务中心确认；接受后任务会进入执行列表。"
+        action-label="查看派单邀请"
         @action="router.push('/courier/tasks')"
       />
       <CourierTaskTable v-else :tasks="recentTasks" />
@@ -90,6 +108,7 @@ onMounted(load)
 
 <style scoped>
 .courier-dashboard__error { margin-bottom: 18px; }
+.courier-dashboard__route { margin-bottom: 22px; }
 .courier-dashboard__recent { padding: 24px; border: 1px solid #dfeae9; border-radius: 18px; background: #fff; box-shadow: 0 12px 32px rgb(12 71 68 / 5%); }
 .courier-dashboard__header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .courier-dashboard__header h2 { margin: 0; color: #224f4c; font-size: 18px; }

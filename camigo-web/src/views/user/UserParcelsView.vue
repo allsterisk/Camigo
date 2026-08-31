@@ -33,7 +33,7 @@ onMounted(() => query())
 
 <template>
   <div>
-    <PageHeader eyebrow="MY PARCELS" title="我的快递" description="按快递单号或状态查询属于你的校园包裹。" refreshable :refreshing="loading" @refresh="query(page)" />
+    <PageHeader title="我的快递" description="按快递单号或状态查询属于你的校园包裹。" refreshable :refreshing="loading" @refresh="query(page)" />
     <ParcelFilters v-model:tracking-no="filters.trackingNo" v-model:status="filters.status" :loading="loading" @search="query()" @reset="reset" />
     <el-alert v-if="errorMessage" class="user-parcels__error" :title="errorMessage" type="error" :closable="false" show-icon />
     <section class="user-parcels__table-card">

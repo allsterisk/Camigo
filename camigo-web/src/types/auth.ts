@@ -21,6 +21,7 @@ export interface LoginResponse {
   tokenType: 'Bearer' | string
   accessToken: string
   user: UserInfo
+  locationConfirmed: boolean
 }
 
 export const ROLE_HOME: Record<UserRole, string> = {

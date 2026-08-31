@@ -21,6 +21,7 @@ public class StorageRecord extends BaseEntity {
     private String status;
     private LocalDateTime storedTime;
     private LocalDateTime releasedTime;
+    private String pickupCode;
     private String pickupCodeHash;
     private LocalDateTime codeExpireTime;
 

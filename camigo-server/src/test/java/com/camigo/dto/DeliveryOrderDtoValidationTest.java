@@ -18,16 +18,16 @@ class DeliveryOrderDtoValidationTest {
 
     @Test
     void shouldAcceptValidCreateRequest() {
-        DeliveryOrderCreateDTO request = new DeliveryOrderCreateDTO(1L, null, "NORMAL", 30);
+        DeliveryOrderCreateDTO request = new DeliveryOrderCreateDTO(1L, null, "NORMAL", 30, 25L);
 
         assertThat(validator.validate(request)).isEmpty();
     }
 
     @Test
     void shouldRejectInvalidCreateFields() {
-        DeliveryOrderCreateDTO request = new DeliveryOrderCreateDTO(0L, -1L, "IMMEDIATE", 1441);
+        DeliveryOrderCreateDTO request = new DeliveryOrderCreateDTO(0L, -1L, "IMMEDIATE", 1441, 0L);
 
-        assertThat(validator.validate(request)).hasSize(4);
+        assertThat(validator.validate(request)).hasSize(5);
     }
 
     @Test

@@ -22,12 +22,12 @@ const { isSubmitting, errorMessage, submit } = useLogin()
 
 @media (max-width: 900px) {
   .login-page { padding: 18px; }
-  .login-page__frame { grid-template-columns: 1fr; }
+  .login-page__frame { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 560px) {
   .login-page { padding: 0; background: #fff; }
-  .login-page__frame { min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+  .login-page__frame { width: 100%; min-width: 0; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
   .login-page__frame > :last-child { padding: 36px 24px; }
 }
 </style>

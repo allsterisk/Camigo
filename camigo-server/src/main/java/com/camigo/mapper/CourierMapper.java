@@ -15,8 +15,34 @@ public interface CourierMapper extends BaseMapper<Courier> {
     /**
      * 接单和完成任务时锁定配送员档案，串行化容量判断与可用状态更新。
      */
-    @Select("SELECT * FROM couriers WHERE user_id = #{userId} FOR UPDATE")
+    @Select("""
+            SELECT id, user_id, courier_no, employment_status, availability_status,
+                   max_active_orders, rating_avg, current_location_id, location_update_time,
+                   create_time, update_time
+            FROM couriers
+            WHERE user_id = #{userId}
+            FOR UPDATE
+            """)
     Courier selectByUserIdForUpdate(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT id, user_id, courier_no, employment_status, availability_status,
+                   max_active_orders, rating_avg, current_location_id, location_update_time,
+                   create_time, update_time
+            FROM couriers
+            WHERE user_id = #{userId}
+            """)
+    Courier selectByUserId(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT id, user_id, courier_no, employment_status, availability_status,
+                   max_active_orders, rating_avg, current_location_id, location_update_time,
+                   create_time, update_time
+            FROM couriers
+            WHERE id = #{courierId}
+            FOR UPDATE
+            """)
+    Courier selectByIdForUpdate(@Param("courierId") Long courierId);
 
     @Select("""
             <script>

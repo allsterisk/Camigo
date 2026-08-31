@@ -41,4 +41,20 @@ public interface LockerMapper extends BaseMapper<Locker> {
     Page<AdminLockerVO> selectAdminPage(Page<AdminLockerVO> page,
                                         @Param("keyword") String keyword,
                                         @Param("operationStatus") String operationStatus);
+
+    @Select("""
+            SELECT DISTINCT l.id, l.locker_code, l.locker_name, l.location_id,
+                   l.total_slots, l.operation_status, l.last_heartbeat_time,
+                   l.create_time, l.update_time
+            FROM lockers l
+            JOIN locker_slots s ON s.locker_id = l.id
+            WHERE l.location_id = #{locationId}
+              AND l.operation_status = 'ONLINE'
+              AND FIELD(s.size_class, 'S', 'M', 'L', 'XL')
+                  >= FIELD(#{parcelSize}, 'S', 'M', 'L', 'XL')
+            ORDER BY l.id
+            LIMIT 1
+            """)
+    Locker selectCompatibleOnlineAtLocation(@Param("locationId") Long locationId,
+                                             @Param("parcelSize") String parcelSize);
 }

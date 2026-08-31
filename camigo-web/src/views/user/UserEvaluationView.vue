@@ -24,7 +24,6 @@ onMounted(loadOrders)
 <template>
   <div>
     <PageHeader
-      eyebrow="SERVICE REVIEW"
       title="配送评价"
       description="为已完成的校园配送留下星级评分和体验反馈。"
     />

@@ -4,14 +4,12 @@ import com.camigo.annotation.RequireRoles;
 import com.camigo.common.PageResult;
 import com.camigo.common.Result;
 import com.camigo.dto.ParcelPickupDTO;
-import com.camigo.dto.ParcelStorageDTO;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.LockerService;
 import com.camigo.service.AdminManagementService;
 import com.camigo.vo.AdminLockerVO;
 import com.camigo.vo.LockerStatusVO;
 import com.camigo.vo.PickupRecordVO;
-import com.camigo.vo.StorageRecordVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -41,13 +39,7 @@ public class LockerController {
         this.adminManagementService = adminManagementService;
     }
 
-    @PostMapping("/storage")
-    public Result<StorageRecordVO> store(
-            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
-            @Valid @RequestBody ParcelStorageDTO request) {
-        return Result.success(lockerService.storeParcel(userId, request));
-    }
-
+    @RequireRoles("USER")
     @PostMapping("/pickup")
     public Result<PickupRecordVO> pickup(
             @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,

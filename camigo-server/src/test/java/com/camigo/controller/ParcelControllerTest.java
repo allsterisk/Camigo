@@ -16,6 +16,8 @@ import com.camigo.dto.ParcelStatusUpdateDTO;
 import com.camigo.exception.GlobalExceptionHandler;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.ParcelService;
+import com.camigo.service.LockerService;
+import com.camigo.vo.ParcelPickupAccessVO;
 import com.camigo.vo.ParcelVO;
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,12 +35,14 @@ class ParcelControllerTest {
 
     @Mock
     private ParcelService parcelService;
+    @Mock
+    private LockerService lockerService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ParcelController(parcelService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new ParcelController(parcelService, lockerService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -94,9 +98,20 @@ class ParcelControllerTest {
         verify(parcelService).updateStatus(eq(7L), eq(10L), any(ParcelStatusUpdateDTO.class));
     }
 
+    @Test
+    void shouldExposePickupCodeOnlyThroughOwnedParcelDetailPath() throws Exception {
+        when(lockerService.getPickupAccess(7L, 10L)).thenReturn(new ParcelPickupAccessVO(
+                10L, 51L, 3L, "1号楼快递柜", 21L, "M-01", "0042", null));
+
+        mockMvc.perform(get("/api/parcels/10/pickup-access")
+                        .requestAttr(LoginInterceptor.CURRENT_USER_ID, 7L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pickupCode").value("0042"));
+    }
+
     private ParcelVO parcel() {
         return new ParcelVO(10L, "SF202608030001", "SF", 7L, "李四", null,
                 9L, 3L, "M", new BigDecimal("1.25"), "ARRIVED",
-                null, null, null);
+                false, null, null, null);
     }
 }

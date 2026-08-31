@@ -1,16 +1,22 @@
 export type DeliveryOrderStatus = 'WAITING' | 'PROCESSING' | 'DELIVERED'
 
-export type DeliveryOrderPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
-
 export interface CourierDeliveryOrder {
   id: number
   orderNo: string
   parcelId: number
+  trackingNo: string
+  carrierCode: string
+  pickupLocationId: number
+  pickupLocationName: string
   destinationLocationId: number
+  destinationLocationName: string
   assignedCourierId: number | null
-  priority: DeliveryOrderPriority | string
+  sizeClass: 'S' | 'M' | 'L' | 'XL'
+  weightKg: number | null
   status: DeliveryOrderStatus
-  predictedMinutes: number | null
+  executionStatus: 'ACCEPTED' | 'PICKING_UP' | 'IN_TRANSIT' | 'ARRIVED' | string
+  routeSequenceNo: number | null
+  estimatedArrivalTime: string | null
   acceptedTime: string | null
   completedTime: string | null
   createTime: string
@@ -21,10 +27,6 @@ export interface CourierDeliveryOrderQuery {
   page: number
   pageSize: number
   status?: DeliveryOrderStatus
-}
-
-export interface DeliveryOrderStatusPayload {
-  status: 'DELIVERED'
 }
 
 export interface UserDeliveryOrder {

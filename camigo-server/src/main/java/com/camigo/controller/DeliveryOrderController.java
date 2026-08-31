@@ -8,6 +8,7 @@ import com.camigo.dto.DeliveryOrderStatusDTO;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.DeliveryOrderService;
 import com.camigo.vo.DeliveryOrderVO;
+import com.camigo.vo.CourierTaskVO;
 import com.camigo.vo.UserDeliveryOrderVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -60,10 +61,10 @@ public class DeliveryOrderController {
         return Result.success(deliveryOrderService.create(userId, request));
     }
 
-    @Operation(summary = "配送员分页查看任务", description = "返回可接任务以及当前配送员自己的任务")
+    @Operation(summary = "配送员分页查看执行中任务", description = "返回已经分配给当前配送员的任务")
     @RequireRoles("COURIER")
     @GetMapping("/tasks")
-    public Result<PageResult<DeliveryOrderVO>> listTasks(
+    public Result<PageResult<CourierTaskVO>> listTasks(
             @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
             @RequestParam(defaultValue = "1") @Min(1) long page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(200) long pageSize,
