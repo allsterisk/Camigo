@@ -106,6 +106,36 @@ class IntelligentDispatchServiceTest {
     }
 
     @Test
+    void shouldCreateNewOrderWhenAdminRestartsReturnedSortingParcel() {
+        ParcelEntity parcel = new ParcelEntity();
+        parcel.setId(10L);
+        parcel.setCurrentStatus("SORTING");
+        when(parcelMapper.selectByIdForUpdate(10L)).thenReturn(parcel);
+        when(orderMapper.selectLatestIdByParcelId(10L)).thenReturn(5L);
+        DeliveryOrder failed = order("FAILED");
+        failed.setPriority("NORMAL");
+        when(orderMapper.selectByIdForUpdate(5L)).thenReturn(failed);
+        when(orderMapper.insert(any(DeliveryOrder.class))).thenAnswer(invocation -> {
+            DeliveryOrder inserted = invocation.getArgument(0);
+            inserted.setId(6L);
+            return 1;
+        });
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+        when(assignmentMapper.selectCount(any())).thenReturn(0L);
+        when(assignmentMapper.selectEligibleCandidates(eq(6L), any())).thenReturn(List.of());
+
+        service.startDispatchByParcel(7L, 10L);
+
+        ArgumentCaptor<DeliveryOrder> orderCaptor = ArgumentCaptor.forClass(DeliveryOrder.class);
+        verify(orderMapper).insert(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getParcelId()).isEqualTo(10L);
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo("ASSIGNING");
+        assertThat(orderCaptor.getValue().getOrderNo()).startsWith("DO");
+        verify(parcelLifecycleService).changeStatus(parcel, "WAITING_ASSIGNMENT", 7L,
+                "ADMIN", "管理员开始重新配送");
+    }
+
+    @Test
     void shouldAcceptOnlyOfferedAssignmentAndPersistRouteAtomically() {
         DeliveryAssignment offered = assignment(12L, 3L, "OFFERED");
         offered.setDeliveryOrderId(5L);

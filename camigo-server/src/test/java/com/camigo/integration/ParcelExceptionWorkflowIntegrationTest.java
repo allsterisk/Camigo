@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.camigo.CamigoApplication;
 import com.camigo.dispatch.CourierRoutePlanningService;
+import com.camigo.dispatch.IntelligentDispatchService;
 import com.camigo.dto.ParcelExceptionReportDTO;
 import com.camigo.dto.ParcelExceptionResolutionDTO;
 import com.camigo.dto.ParcelStatusUpdateDTO;
@@ -44,6 +45,7 @@ class ParcelExceptionWorkflowIntegrationTest {
     @Autowired private ParcelExceptionService exceptionService;
     @Autowired private CourierExecutionService executionService;
     @Autowired private CourierRoutePlanningService planningService;
+    @Autowired private IntelligentDispatchService dispatchService;
     @Autowired private RouteVersionService routeVersionService;
     @Autowired private ParcelLifecycleService lifecycleService;
     @Autowired private ParcelService parcelService;
@@ -94,7 +96,8 @@ class ParcelExceptionWorkflowIntegrationTest {
     void shouldReturnToSortingAndUpdateCourierLocation() {
         Fixture fixture = prepareInTransitOrder();
         ParcelExceptionVO report = report(fixture);
-        ParcelExceptionVO resolved = exceptionService.resolve(activeAdminId(), report.id(),
+        long adminId = activeAdminId();
+        ParcelExceptionVO resolved = exceptionService.resolve(adminId, report.id(),
                 new ParcelExceptionResolutionDTO("RETURN_TO_SORTING", "包裹已交回服务站复核"));
 
         assertThat(resolved.status()).isEqualTo("RESOLVED");
@@ -102,6 +105,16 @@ class ParcelExceptionWorkflowIntegrationTest {
         assertThat(courierMapper.selectById(fixture.courier().getId()).getCurrentLocationId())
                 .isEqualTo(fixture.order().getPickupLocationId());
         assertThat(orderMapper.selectById(fixture.order().getId()).getStatus()).isEqualTo("FAILED");
+        assertThat(parcelService.getById(adminId, fixture.parcel().getId())
+                .deliveryStartAvailable()).isTrue();
+
+        dispatchService.startDispatchByParcel(adminId, fixture.parcel().getId());
+
+        Long retryOrderId = orderMapper.selectLatestIdByParcelId(fixture.parcel().getId());
+        assertThat(retryOrderId).isNotEqualTo(fixture.order().getId());
+        assertThat(orderMapper.selectById(retryOrderId).getStatus()).isEqualTo("ASSIGNING");
+        assertThat(parcelMapper.selectById(fixture.parcel().getId()).getCurrentStatus())
+                .isEqualTo("WAITING_ASSIGNMENT");
     }
 
     @Test

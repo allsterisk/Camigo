@@ -309,7 +309,9 @@ public class ParcelServiceImpl implements ParcelService {
         DeliveryOrder order = orderId == null ? null : deliveryOrderMapper.selectById(orderId);
         boolean startAvailable = order != null && ("CREATED".equals(order.getStatus())
                 || ("ASSIGNING".equals(order.getStatus())
-                    && Integer.valueOf(1).equals(order.getManualDispatchRequired())));
+                    && Integer.valueOf(1).equals(order.getManualDispatchRequired()))
+                || ("FAILED".equals(order.getStatus())
+                    && "SORTING".equals(parcel.getCurrentStatus())));
         return toVo(parcel, startAvailable);
     }
 

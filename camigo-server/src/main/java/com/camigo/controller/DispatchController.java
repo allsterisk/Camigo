@@ -78,8 +78,10 @@ public class DispatchController {
     @Operation(summary = "管理员按快递启动首轮或下一轮智能派单")
     @RequireRoles("ADMIN")
     @PostMapping("/parcels/{parcelId}/start")
-    public Result<Void> startByParcel(@PathVariable @Positive Long parcelId) {
-        dispatchService.startDispatchByParcel(parcelId);
+    public Result<Void> startByParcel(
+            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
+            @PathVariable @Positive Long parcelId) {
+        dispatchService.startDispatchByParcel(userId, parcelId);
         return Result.success();
     }
 

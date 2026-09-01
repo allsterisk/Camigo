@@ -20,6 +20,7 @@ import com.camigo.mapper.DeliveryOrderMapper;
 import com.camigo.mapper.DeliveryRouteMapper;
 import com.camigo.mapper.ParcelMapper;
 import com.camigo.mapper.RouteStopMapper;
+import com.camigo.mapper.UserMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ class IntelligentDispatchIntegrationTest {
     @Autowired private ParcelMapper parcelMapper;
     @Autowired private DeliveryRouteMapper routeMapper;
     @Autowired private RouteStopMapper stopMapper;
+    @Autowired private UserMapper userMapper;
 
     @Test
     void shouldScoreOfferAcceptAndPersistExactlyOneCourierRoute() {
@@ -175,7 +177,7 @@ class IntelligentDispatchIntegrationTest {
         assertThat(orderMapper.selectDeliveryStartAvailableParcelIds(List.of(order.getParcelId())))
                 .containsExactly(order.getParcelId());
 
-        dispatchService.startDispatchByParcel(order.getParcelId());
+        dispatchService.startDispatchByParcel(activeAdminId(), order.getParcelId());
         DeliveryOrder secondPause = orderMapper.selectById(order.getId());
         assertThat(secondPause.getDispatchRound()).isEqualTo(2);
         assertThat(secondPause.getManualDispatchRequired()).isEqualTo(1);
@@ -230,5 +232,15 @@ class IntelligentDispatchIntegrationTest {
                         .eq(DeliveryAssignment::getDecision, "OFFERED"));
         assertThat(assignment).isNotNull();
         return assignment;
+    }
+
+    private long activeAdminId() {
+        return userMapper.selectList(new LambdaQueryWrapper<com.camigo.entity.User>()
+                        .eq(com.camigo.entity.User::getStatus, "ACTIVE"))
+                .stream()
+                .filter(user -> userMapper.selectRoleCodes(user.getId()).contains("ADMIN"))
+                .mapToLong(com.camigo.entity.User::getId)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("缺少阶段4验收管理员"));
     }
 }

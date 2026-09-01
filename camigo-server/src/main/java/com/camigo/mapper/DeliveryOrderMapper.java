@@ -83,9 +83,12 @@ public interface DeliveryOrderMapper extends BaseMapper<DeliveryOrder> {
                 </foreach>
                 GROUP BY parcel_id
             ) latest ON latest.latest_id = latest_order.id
+            JOIN parcels parcel ON parcel.id = latest_order.parcel_id
             WHERE latest_order.status = 'CREATED'
                OR (latest_order.status = 'ASSIGNING'
                    AND latest_order.manual_dispatch_required = 1)
+               OR (latest_order.status = 'FAILED'
+                   AND parcel.current_status = 'SORTING')
             </script>
             """)
     List<Long> selectDeliveryStartAvailableParcelIds(@Param("parcelIds") List<Long> parcelIds);

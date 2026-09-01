@@ -21,7 +21,9 @@ import com.camigo.service.ParcelLifecycleService;
 import com.camigo.vo.DispatchAssignmentDetailVO;
 import com.camigo.vo.DispatchOfferVO;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ import org.springframework.util.StringUtils;
 public class IntelligentDispatchService {
 
     private static final int BATCH_SIZE = 100;
+    private static final String ADMIN_ROLE = "ADMIN";
     private static final String COURIER_ROLE = "COURIER";
 
     private final DeliveryOrderMapper orderMapper;
@@ -80,12 +83,12 @@ public class IntelligentDispatchService {
 
     /** 管理员按包裹启动首轮或人工确认后的下一轮派单。 */
     @Transactional
-    public void startDispatchByParcel(long parcelId) {
-        ParcelEntity parcel = parcelMapper.selectById(parcelId);
+    public void startDispatchByParcel(long adminUserId, long parcelId) {
+        ParcelEntity parcel = parcelMapper.selectByIdForUpdate(parcelId);
         if (parcel == null) {
             throw new ResourceNotFoundException("快递不存在");
         }
-        if (!"WAITING_ASSIGNMENT".equals(parcel.getCurrentStatus())) {
+        if (!List.of("SORTING", "WAITING_ASSIGNMENT").contains(parcel.getCurrentStatus())) {
             throw conflict("当前快递不是已到校待配送状态");
         }
         Long orderId = orderMapper.selectLatestIdByParcelId(parcelId);
@@ -93,6 +96,14 @@ public class IntelligentDispatchService {
             throw new ResourceNotFoundException("该快递尚无配送任务");
         }
         DeliveryOrder order = requireLockedOrder(orderId);
+        if ("SORTING".equals(parcel.getCurrentStatus())) {
+            if (!"FAILED".equals(order.getStatus())) {
+                throw conflict("当前分拣包裹没有可重新配送的失败任务");
+            }
+            order = createRetryOrder(order);
+            parcelLifecycleService.changeStatus(parcel, "WAITING_ASSIGNMENT", adminUserId,
+                    ADMIN_ROLE, "管理员开始重新配送");
+        }
         boolean initialRound = "CREATED".equals(order.getStatus());
         boolean awaitingAdmin = "ASSIGNING".equals(order.getStatus())
                 && Integer.valueOf(1).equals(order.getManualDispatchRequired());
@@ -100,6 +111,28 @@ public class IntelligentDispatchService {
             throw conflict("当前轮派单尚未结束，无需重复开始配送");
         }
         startDispatchLocked(order, LocalDateTime.now());
+    }
+
+    private DeliveryOrder createRetryOrder(DeliveryOrder previous) {
+        if (previous.getPickupLocationId() == null || previous.getDestinationLocationId() == null) {
+            throw conflict("原配送任务缺少取件站或目的地，不能重新配送");
+        }
+        DeliveryOrder retry = new DeliveryOrder();
+        retry.setOrderNo("DO" + LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + UUID.randomUUID().toString().replace("-", "")
+                .substring(0, 8).toUpperCase());
+        retry.setParcelId(previous.getParcelId());
+        retry.setPickupLocationId(previous.getPickupLocationId());
+        retry.setDestinationLocationId(previous.getDestinationLocationId());
+        retry.setPriority(previous.getPriority() == null ? "NORMAL" : previous.getPriority());
+        retry.setStatus("CREATED");
+        retry.setDispatchRound(0);
+        retry.setManualDispatchRequired(0);
+        if (orderMapper.insert(retry) != 1) {
+            throw conflict("重新创建配送任务失败");
+        }
+        return retry;
     }
 
     private void startDispatchLocked(DeliveryOrder order, LocalDateTime now) {

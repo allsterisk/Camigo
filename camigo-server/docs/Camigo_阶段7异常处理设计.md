@@ -58,7 +58,7 @@ MySQL `EXPLAIN FORMAT=TREE` 验证待处理列表使用 `idx_exception_reports_s
 ## 6. 管理员处理事务
 
 - `RESUME_DELIVERY`：问题已解决且包裹仍由原配送员持有；包裹 `EXCEPTION → DELIVERING`，订单 `FAILED → IN_TRANSIT`，重新加入独立 `DROPOFF` 节点并重算路线。
-- `RETURN_TO_SORTING`：确认包裹已回原取件服务站；包裹 `EXCEPTION → SORTING`，订单保持结束，配送员位置更新到服务站并重算剩余路线。
+- `RETURN_TO_SORTING`：确认包裹已回原取件服务站；包裹 `EXCEPTION → SORTING`，原订单保持结束，配送员位置更新到服务站并重算剩余路线。管理员可在快递管理中点击“开始配送”，系统保留失败订单并新建配送单进入智能派单。
 - `CONFIRM_RETURNED`：确认已经实际退回服务站；包裹 `EXCEPTION → RETURNED`，订单保持结束，配送员位置更新到服务站并重算路线。
 
 处理完成时同时保存管理员、处理时间、处理类型和说明。处理过的报告不能重复处理；原配送员达到容量上限时不能恢复配送。

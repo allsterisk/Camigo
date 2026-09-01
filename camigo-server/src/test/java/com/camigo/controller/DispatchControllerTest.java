@@ -101,9 +101,10 @@ class DispatchControllerTest {
 
     @Test
     void shouldLetAdminStartNextRoundByParcel() throws Exception {
-        mockMvc.perform(post("/api/delivery-assignments/parcels/10/start"))
+        mockMvc.perform(post("/api/delivery-assignments/parcels/10/start")
+                        .requestAttr(LoginInterceptor.CURRENT_USER_ID, 7L))
                 .andExpect(status().isOk());
 
-        verify(dispatchService).startDispatchByParcel(10L);
+        verify(dispatchService).startDispatchByParcel(7L, 10L);
     }
 }
