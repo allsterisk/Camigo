@@ -7,10 +7,12 @@ export interface Parcel {
   trackingNo: string
   carrierCode: string
   recipientUserId: number
+  recipientName: string | null
   senderName: string
   senderPhoneMasked: string | null
   destinationLocationId: number
   targetLockerId: number
+  targetLockerName: string | null
   sizeClass: string
   weightKg: number | null
   currentStatus: ParcelStatus | string

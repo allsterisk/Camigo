@@ -94,7 +94,9 @@ class ParcelServiceImplTest {
 
         assertThat(result.id()).isEqualTo(10L);
         assertThat(result.recipientUserId()).isEqualTo(7L);
+        assertThat(result.recipientName()).isEqualTo("张三");
         assertThat(result.targetLockerId()).isEqualTo(3L);
+        assertThat(result.targetLockerName()).isEqualTo("1号楼智能柜");
         assertThat(result.currentStatus()).isEqualTo("ARRIVED");
         verify(lifecycleService).recordInitialStatus(any(ParcelEntity.class), eq(1L), eq("ADMIN"));
     }
@@ -178,6 +180,7 @@ class ParcelServiceImplTest {
         Locker locker = new Locker();
         locker.setId(3L);
         locker.setLocationId(9L);
+        locker.setLockerName("1号楼智能柜");
         locker.setOperationStatus("ONLINE");
         return locker;
     }

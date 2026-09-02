@@ -25,8 +25,10 @@ import com.camigo.service.ParcelLifecycleService;
 import com.camigo.service.ParcelService;
 import com.camigo.vo.ParcelVO;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -103,7 +105,7 @@ public class ParcelServiceImpl implements ParcelService {
             throw new BusinessException(ErrorCodes.PARCEL_CONFLICT, "快递单号已存在");
         }
         lifecycleService.recordInitialStatus(parcel, userId, ADMIN_ROLE);
-        return toVo(parcel);
+        return toVo(parcel, false, recipient.getRealName(), locker.getLockerName());
     }
 
     @Override
@@ -207,11 +209,16 @@ public class ParcelServiceImpl implements ParcelService {
         applyPublicStatusFilter(query, status);
 
         Page<ParcelEntity> result = parcelMapper.selectPage(new Page<>(page, pageSize), query);
-        List<Long> parcelIds = result.getRecords().stream().map(ParcelEntity::getId).toList();
+        List<ParcelEntity> parcels = result.getRecords();
+        List<Long> parcelIds = parcels.stream().map(ParcelEntity::getId).toList();
         Set<Long> startAvailableIds = parcelIds.isEmpty() ? Set.of() : Set.copyOf(
                 deliveryOrderMapper.selectDeliveryStartAvailableParcelIds(parcelIds));
-        List<ParcelVO> records = result.getRecords().stream()
-                .map(parcel -> toVo(parcel, startAvailableIds.contains(parcel.getId())))
+        Map<Long, String> recipientNames = loadRecipientNames(parcels);
+        Map<Long, String> lockerNames = loadLockerNames(parcels);
+        List<ParcelVO> records = parcels.stream()
+                .map(parcel -> toVo(parcel, startAvailableIds.contains(parcel.getId()),
+                        recipientNames.get(parcel.getRecipientUserId()),
+                        lockerNames.get(parcel.getTargetLockerId())))
                 .toList();
         return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
     }
@@ -312,16 +319,60 @@ public class ParcelServiceImpl implements ParcelService {
                     && Integer.valueOf(1).equals(order.getManualDispatchRequired()))
                 || ("FAILED".equals(order.getStatus())
                     && "SORTING".equals(parcel.getCurrentStatus())));
-        return toVo(parcel, startAvailable);
+        String recipientName = null;
+        if (parcel.getRecipientUserId() != null) {
+            User recipient = userMapper.selectById(parcel.getRecipientUserId());
+            recipientName = recipient == null ? null : recipient.getRealName();
+        }
+        String lockerName = null;
+        if (parcel.getTargetLockerId() != null) {
+            Locker locker = lockerMapper.selectById(parcel.getTargetLockerId());
+            lockerName = locker == null ? null : locker.getLockerName();
+        }
+        return toVo(parcel, startAvailable, recipientName, lockerName);
     }
 
-    private ParcelVO toVo(ParcelEntity parcel, boolean deliveryStartAvailable) {
+    private ParcelVO toVo(ParcelEntity parcel, boolean deliveryStartAvailable,
+                          String recipientName, String targetLockerName) {
         return new ParcelVO(parcel.getId(), parcel.getTrackingNo(), parcel.getCarrierCode(),
-                parcel.getRecipientUserId(), parcel.getSenderName(), parcel.getSenderPhoneMasked(),
-                parcel.getDestinationLocationId(), parcel.getTargetLockerId(), parcel.getSizeClass(),
+                parcel.getRecipientUserId(), recipientName, parcel.getSenderName(),
+                parcel.getSenderPhoneMasked(), parcel.getDestinationLocationId(),
+                parcel.getTargetLockerId(), targetLockerName, parcel.getSizeClass(),
                 parcel.getWeightKg(), toPublicStatus(parcel.getCurrentStatus()),
                 deliveryStartAvailable, parcel.getArriveTime(), parcel.getCreateTime(),
                 parcel.getUpdateTime());
+    }
+
+    private Map<Long, String> loadRecipientNames(List<ParcelEntity> parcels) {
+        List<Long> ids = parcels.stream()
+                .map(ParcelEntity::getRecipientUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> names = new HashMap<>();
+        for (User user : userMapper.selectBatchIds(ids)) {
+            names.put(user.getId(), user.getRealName());
+        }
+        return names;
+    }
+
+    private Map<Long, String> loadLockerNames(List<ParcelEntity> parcels) {
+        List<Long> ids = parcels.stream()
+                .map(ParcelEntity::getTargetLockerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> names = new HashMap<>();
+        for (Locker locker : lockerMapper.selectBatchIds(ids)) {
+            names.put(locker.getId(), locker.getLockerName());
+        }
+        return names;
     }
 
     private String toPublicStatus(String internalStatus) {
