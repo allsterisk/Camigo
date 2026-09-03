@@ -8,11 +8,14 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   actionOrderId?: number | null
   showActions?: boolean
+  /** 是否在操作列展示「查看评价」入口（配送记录页使用） */
+  showEvaluation?: boolean
   timeColumnLabel?: string
 }>(), {
   loading: false,
   actionOrderId: null,
   showActions: false,
+  showEvaluation: false,
   timeColumnLabel: '任务时间',
 })
 
@@ -21,6 +24,7 @@ defineEmits<{
   arrival: [orderId: number]
   storage: [orderId: number]
   exception: [orderId: number]
+  evaluation: [orderId: number]
 }>()
 
 function executionLabel(status: string): string {
@@ -93,6 +97,12 @@ function executionLabel(status: string): string {
           :disabled="actionOrderId !== null"
           @click="$emit('exception', row.id)"
         >上报异常</el-button>
+        <el-button
+          v-if="showEvaluation"
+          type="primary"
+          link
+          @click="$emit('evaluation', row.id)"
+        >查看评价</el-button>
         </div>
       </template>
     </el-table-column>

@@ -4,10 +4,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminDispatchDetailDialog from '@/components/admin/AdminDispatchDetailDialog.vue'
 import AdminFilters from '@/components/admin/AdminFilters.vue'
 import AdminParcelTable from '@/components/admin/AdminParcelTable.vue'
+import EvaluationDetailDialog from '@/components/common/EvaluationDetailDialog.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useAdminDispatchDetails } from '@/composables/useAdminDispatchDetails'
 import { useAdminListQuery } from '@/composables/useAdminListQuery'
 import { useAdminParcels } from '@/composables/useAdminParcels'
+import { useEvaluationViewer } from '@/composables/useEvaluationViewer'
 import type { ParcelStatus } from '@/types/parcel'
 
 const filterOptions = [
@@ -23,6 +25,11 @@ const {
   visible: dispatchVisible, parcelId: dispatchParcelId, records: dispatchRecords,
   loading: dispatchLoading, errorMessage: dispatchError, open: openDispatch, close: closeDispatch,
 } = useAdminDispatchDetails()
+const {
+  visible: evaluationVisible, loading: evaluationLoading,
+  errorMessage: evaluationError, evaluations,
+  open: openEvaluation, close: closeEvaluation,
+} = useEvaluationViewer('parcel')
 
 function refresh() {
   return load({
@@ -61,10 +68,19 @@ watch(() => route.query, refresh, { immediate: true })
     <AdminFilters v-model:keyword="keyword" v-model:status="status" placeholder="输入快递单号" :options="filterOptions" :loading="loading" @search="search" @reset="reset" />
     <el-alert v-if="errorMessage" class="admin-parcels__alert" :title="errorMessage" type="error" :closable="false" show-icon />
     <section class="admin-parcels__surface">
-      <AdminParcelTable :parcels="records" :loading="loading" :action-id="actionId" @status-change="handleStatus" @start-delivery="handleStartDelivery" @dispatch-details="openDispatch" />
+      <AdminParcelTable :parcels="records" :loading="loading" :action-id="actionId" @status-change="handleStatus" @start-delivery="handleStartDelivery" @dispatch-details="openDispatch" @evaluation="openEvaluation" />
       <el-pagination v-if="total > 10" class="admin-parcels__pagination" background layout="prev, pager, next, total" :current-page="page" :page-size="10" :total="total" @current-change="setPage" />
     </section>
     <AdminDispatchDetailDialog v-model="dispatchVisible" :parcel-id="dispatchParcelId" :records="dispatchRecords" :loading="dispatchLoading" :error-message="dispatchError" @closed="closeDispatch" />
+    <EvaluationDetailDialog
+      v-model="evaluationVisible"
+      title="快递评价"
+      :evaluations="evaluations"
+      :loading="evaluationLoading"
+      :error-message="evaluationError"
+      empty-text="该快递暂无评价"
+      @closed="closeEvaluation"
+    />
   </div>
 </template>
 

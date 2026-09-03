@@ -1,5 +1,6 @@
 package com.camigo.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.camigo.common.ErrorCodes;
 import com.camigo.dto.EvaluationCreateDTO;
@@ -8,6 +9,7 @@ import com.camigo.entity.DeliveryOrder;
 import com.camigo.entity.Evaluation;
 import com.camigo.entity.ParcelEntity;
 import com.camigo.exception.BusinessException;
+import com.camigo.exception.ForbiddenException;
 import com.camigo.exception.ResourceNotFoundException;
 import com.camigo.mapper.CourierMapper;
 import com.camigo.mapper.DeliveryOrderMapper;
@@ -17,6 +19,8 @@ import com.camigo.service.EvaluationService;
 import com.camigo.vo.EvaluationVO;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +31,8 @@ import org.springframework.util.StringUtils;
  */
 @Service
 public class EvaluationServiceImpl implements EvaluationService {
+
+    private static final String ROLE_ADMIN = "ADMIN";
 
     private final EvaluationMapper evaluationMapper;
     private final DeliveryOrderMapper orderMapper;
@@ -78,6 +84,44 @@ public class EvaluationServiceImpl implements EvaluationService {
                 .eq(Courier::getId, order.getAssignedCourierId())
                 .set(Courier::getRatingAvg, average));
         return toVo(evaluation);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvaluationVO> listByParcel(Long userId, Collection<String> roles, Long parcelId) {
+        ParcelEntity parcel = parcelMapper.selectById(parcelId);
+        if (parcel == null) {
+            throw new ResourceNotFoundException("快递不存在");
+        }
+        if (!isAdmin(roles) && !userId.equals(parcel.getRecipientUserId())) {
+            throw new ForbiddenException("只能查看本人快递的评价");
+        }
+        return evaluationMapper.selectVisibleByParcelId(parcelId).stream()
+                .map(this::toVo)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvaluationVO getByOrder(Long userId, Collection<String> roles, Long orderId) {
+        DeliveryOrder order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new ResourceNotFoundException("配送订单不存在");
+        }
+        if (!isAdmin(roles)) {
+            Courier courier = courierMapper.selectOne(new LambdaQueryWrapper<Courier>()
+                    .eq(Courier::getUserId, userId));
+            if (courier == null || order.getAssignedCourierId() == null
+                    || !courier.getId().equals(order.getAssignedCourierId())) {
+                throw new ForbiddenException("只能查看本人配送订单的评价");
+            }
+        }
+        Evaluation evaluation = evaluationMapper.selectVisibleByOrderId(orderId);
+        return evaluation == null ? null : toVo(evaluation);
+    }
+
+    private boolean isAdmin(Collection<String> roles) {
+        return roles != null && roles.contains(ROLE_ADMIN);
     }
 
     private EvaluationVO toVo(Evaluation evaluation) {

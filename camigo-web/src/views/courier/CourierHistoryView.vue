@@ -2,14 +2,21 @@
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import EvaluationDetailDialog from '@/components/common/EvaluationDetailDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import CourierTaskTable from '@/components/courier/CourierTaskTable.vue'
 import { useCourierTasks } from '@/composables/useCourierTasks'
+import { useEvaluationViewer } from '@/composables/useEvaluationViewer'
 
 const route = useRoute()
 const router = useRouter()
 const { tasks, total, pageSize, loading, errorMessage, load } = useCourierTasks()
+const {
+  visible: evaluationVisible, loading: evaluationLoading,
+  errorMessage: evaluationError, evaluations,
+  open: openEvaluation, close: closeEvaluation,
+} = useEvaluationViewer('order')
 const currentPage = computed(() => parsePage(route.query.page))
 
 function parsePage(value: unknown): number {
@@ -58,7 +65,10 @@ watch(currentPage, refresh, { immediate: true })
         <CourierTaskTable
           :tasks="tasks"
           :loading="loading"
+          show-actions
+          show-evaluation
           time-column-label="完成时间"
+          @evaluation="openEvaluation"
         />
         <el-pagination
           v-if="total > pageSize"
@@ -72,6 +82,15 @@ watch(currentPage, refresh, { immediate: true })
         />
       </template>
     </section>
+    <EvaluationDetailDialog
+      v-model="evaluationVisible"
+      title="配送评价"
+      :evaluations="evaluations"
+      :loading="evaluationLoading"
+      :error-message="evaluationError"
+      empty-text="该配送订单暂无评价"
+      @closed="closeEvaluation"
+    />
   </div>
 </template>
 
