@@ -1,5 +1,7 @@
 # Camigo（校速达）
 
+[简体中文](README.md) | [English](README_EN.md)
+
 Camigo 是校园智能快递与配送系统。本仓库采用 Monorepo 结构，同时管理 Spring Boot 后端和 Vue 3 前端。
 
 ## 项目结构
@@ -9,7 +11,8 @@ camigo/
 ├── camigo-server/    # Spring Boot 3 + MyBatis-Plus 后端
 ├── camigo-web/       # Vue 3 + Vite + TypeScript 前端
 ├── .gitignore
-└── README.md
+├── README.md
+└── README_EN.md
 ```
 
 前后端仍是两个独立应用，分别安装依赖、构建和启动。
