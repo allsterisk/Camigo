@@ -85,7 +85,7 @@ public class ParcelServiceImpl implements ParcelService {
         requireAnyRole(userId, ADMIN_ROLE);
         User recipient = requireActiveRecipient(request.phone().trim(), request.receiver().trim());
         Locker locker = requireOnlineLocker(request.lockerId());
-        ensureActiveLocation(locker.getLocationId());
+        CampusLocation location = requireActiveLocation(locker.getLocationId());
 
         ParcelEntity parcel = new ParcelEntity();
         parcel.setTrackingNo(request.trackingNo().trim().toUpperCase());
@@ -105,7 +105,8 @@ public class ParcelServiceImpl implements ParcelService {
             throw new BusinessException(ErrorCodes.PARCEL_CONFLICT, "快递单号已存在");
         }
         lifecycleService.recordInitialStatus(parcel, userId, ADMIN_ROLE);
-        return toVo(parcel, false, recipient.getRealName(), locker.getLockerName());
+        return toVo(parcel, false, recipient.getRealName(), locker.getLockerName(),
+                location.getAddressDetail());
     }
 
     @Override
@@ -214,11 +215,15 @@ public class ParcelServiceImpl implements ParcelService {
         Set<Long> startAvailableIds = parcelIds.isEmpty() ? Set.of() : Set.copyOf(
                 deliveryOrderMapper.selectDeliveryStartAvailableParcelIds(parcelIds));
         Map<Long, String> recipientNames = loadRecipientNames(parcels);
-        Map<Long, String> lockerNames = loadLockerNames(parcels);
+        Map<Long, LockerDisplay> lockerDisplays = loadLockerDisplays(parcels);
         List<ParcelVO> records = parcels.stream()
-                .map(parcel -> toVo(parcel, startAvailableIds.contains(parcel.getId()),
-                        recipientNames.get(parcel.getRecipientUserId()),
-                        lockerNames.get(parcel.getTargetLockerId())))
+                .map(parcel -> {
+                    LockerDisplay locker = lockerDisplays.get(parcel.getTargetLockerId());
+                    return toVo(parcel, startAvailableIds.contains(parcel.getId()),
+                            recipientNames.get(parcel.getRecipientUserId()),
+                            locker == null ? null : locker.lockerName(),
+                            locker == null ? null : locker.addressDetail());
+                })
                 .toList();
         return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
     }
@@ -273,11 +278,12 @@ public class ParcelServiceImpl implements ParcelService {
         return parcel;
     }
 
-    private void ensureActiveLocation(Long locationId) {
+    private CampusLocation requireActiveLocation(Long locationId) {
         CampusLocation location = locationMapper.selectById(locationId);
         if (location == null || !"ACTIVE".equals(location.getStatus())) {
             throw new BusinessException(ErrorCodes.PARCEL_CONFLICT, "快递柜所在位置不存在或已停用");
         }
+        return location;
     }
 
     private boolean isAssignedCourier(Long userId, Long parcelId) {
@@ -325,22 +331,30 @@ public class ParcelServiceImpl implements ParcelService {
             recipientName = recipient == null ? null : recipient.getRealName();
         }
         String lockerName = null;
+        String lockerAddress = null;
         if (parcel.getTargetLockerId() != null) {
             Locker locker = lockerMapper.selectById(parcel.getTargetLockerId());
-            lockerName = locker == null ? null : locker.getLockerName();
+            if (locker != null) {
+                lockerName = locker.getLockerName();
+                if (locker.getLocationId() != null) {
+                    CampusLocation location = locationMapper.selectById(locker.getLocationId());
+                    lockerAddress = location == null ? null : location.getAddressDetail();
+                }
+            }
         }
-        return toVo(parcel, startAvailable, recipientName, lockerName);
+        return toVo(parcel, startAvailable, recipientName, lockerName, lockerAddress);
     }
 
     private ParcelVO toVo(ParcelEntity parcel, boolean deliveryStartAvailable,
-                          String recipientName, String targetLockerName) {
+                          String recipientName, String targetLockerName,
+                          String targetLockerAddress) {
         return new ParcelVO(parcel.getId(), parcel.getTrackingNo(), parcel.getCarrierCode(),
                 parcel.getRecipientUserId(), recipientName, parcel.getSenderName(),
                 parcel.getSenderPhoneMasked(), parcel.getDestinationLocationId(),
-                parcel.getTargetLockerId(), targetLockerName, parcel.getSizeClass(),
-                parcel.getWeightKg(), toPublicStatus(parcel.getCurrentStatus()),
-                deliveryStartAvailable, parcel.getArriveTime(), parcel.getCreateTime(),
-                parcel.getUpdateTime());
+                parcel.getTargetLockerId(), targetLockerName, targetLockerAddress,
+                parcel.getSizeClass(), parcel.getWeightKg(),
+                toPublicStatus(parcel.getCurrentStatus()), deliveryStartAvailable,
+                parcel.getArriveTime(), parcel.getCreateTime(), parcel.getUpdateTime());
     }
 
     private Map<Long, String> loadRecipientNames(List<ParcelEntity> parcels) {
@@ -359,20 +373,36 @@ public class ParcelServiceImpl implements ParcelService {
         return names;
     }
 
-    private Map<Long, String> loadLockerNames(List<ParcelEntity> parcels) {
-        List<Long> ids = parcels.stream()
+    private Map<Long, LockerDisplay> loadLockerDisplays(List<ParcelEntity> parcels) {
+        List<Long> lockerIds = parcels.stream()
                 .map(ParcelEntity::getTargetLockerId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        if (ids.isEmpty()) {
+        if (lockerIds.isEmpty()) {
             return Map.of();
         }
-        Map<Long, String> names = new HashMap<>();
-        for (Locker locker : lockerMapper.selectBatchIds(ids)) {
-            names.put(locker.getId(), locker.getLockerName());
+        List<Locker> lockers = lockerMapper.selectBatchIds(lockerIds);
+        List<Long> locationIds = lockers.stream()
+                .map(Locker::getLocationId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, String> addresses = new HashMap<>();
+        if (!locationIds.isEmpty()) {
+            for (CampusLocation location : locationMapper.selectBatchIds(locationIds)) {
+                addresses.put(location.getId(), location.getAddressDetail());
+            }
         }
-        return names;
+        Map<Long, LockerDisplay> displays = new HashMap<>();
+        for (Locker locker : lockers) {
+            displays.put(locker.getId(), new LockerDisplay(locker.getLockerName(),
+                    addresses.get(locker.getLocationId())));
+        }
+        return displays;
+    }
+
+    private record LockerDisplay(String lockerName, String addressDetail) {
     }
 
     private String toPublicStatus(String internalStatus) {

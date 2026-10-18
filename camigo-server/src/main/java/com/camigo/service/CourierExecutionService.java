@@ -21,6 +21,7 @@ import com.camigo.mapper.RouteStopMapper;
 import com.camigo.routing.RoutePlan;
 import com.camigo.routing.RouteVersionService;
 import com.camigo.vo.CampusLocationOptionVO;
+import com.camigo.vo.CourierBatchPickupVO;
 import com.camigo.vo.CourierExecutionVO;
 import com.camigo.vo.CourierLocationStateVO;
 import com.camigo.vo.CourierRouteStepVO;
@@ -28,9 +29,11 @@ import com.camigo.vo.CourierRouteVO;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -131,13 +134,107 @@ public class CourierExecutionService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        RouteStop stop = requireActionableStop(context.courier(), order,
-                "PICKUP", order.getPickupLocationId(), now);
+        RouteStop stop = requirePickupStop(context.courier(), order, now);
         completeStop(stop, "COMPLETED", now);
         updateOrderStatus(order, List.of("ACCEPTED", "PICKING_UP"), "IN_TRANSIT", null);
         updateCourierLocation(context.courier(), order.getPickupLocationId(), now);
         DeliveryRoute refreshed = refreshRoute(context.courier(), now);
         return executionResult(order, context.parcel(), context.courier(), refreshed);
+    }
+
+    /**
+     * 在配送员当前（或即将到达的）快递站一次性确认该站全部待取件，再刷新剩余路线。
+     */
+    @Transactional
+    public CourierBatchPickupVO confirmPickupBatch(long userId, List<Long> orderIds) {
+        List<Long> requestedIds = normalizeOrderIds(orderIds);
+        Courier snapshot = requireCourier(userId);
+        Courier courier = courierMapper.selectByIdForUpdate(snapshot.getId());
+        ensureEmployed(courier);
+        ensureLocationConfirmed(courier);
+
+        LocalDateTime now = LocalDateTime.now();
+        List<RouteStop> pending = loadActionablePendingStops(courier, now);
+        Long stationLocationId = resolvePickupStationId(courier, pending, requestedIds);
+        Map<Long, RouteStop> availablePickups = collectPendingPickupsAt(pending, stationLocationId);
+        if (availablePickups.isEmpty()) {
+            throw routeConflict("当前位置没有待取件包裹，请先确认你已到达该快递站");
+        }
+        for (Long orderId : requestedIds) {
+            if (!availablePickups.containsKey(orderId)) {
+                throw routeConflict("所选订单不在当前快递站的待取件列表中");
+            }
+        }
+
+        List<Long> pickedOrderIds = new ArrayList<>();
+        List<String> pickedOrderNos = new ArrayList<>();
+        for (Long orderId : requestedIds) {
+            DeliveryOrder order = orderMapper.selectByIdForUpdate(orderId);
+            if (order == null) {
+                throw new ResourceNotFoundException("配送任务不存在");
+            }
+            if (!courier.getId().equals(order.getAssignedCourierId())) {
+                throw new ForbiddenException("不能操作其他配送员的任务");
+            }
+            if (!List.of("ACCEPTED", "PICKING_UP").contains(order.getStatus())) {
+                throw statusConflict("当前订单状态不能确认取件");
+            }
+            if (!Objects.equals(order.getPickupLocationId(), stationLocationId)) {
+                throw routeConflict("所选订单不属于同一取件站");
+            }
+            ParcelEntity parcel = parcelMapper.selectByIdForUpdate(order.getParcelId());
+            if (parcel == null) {
+                throw new ResourceNotFoundException("关联包裹不存在");
+            }
+            if (!"DELIVERING".equals(parcel.getCurrentStatus())) {
+                throw statusConflict("包裹状态与配送订单不一致，不能确认取件");
+            }
+            completeStop(availablePickups.get(orderId), "COMPLETED", now);
+            updateOrderStatus(order, List.of("ACCEPTED", "PICKING_UP"), "IN_TRANSIT", null);
+            pickedOrderIds.add(order.getId());
+            pickedOrderNos.add(order.getOrderNo());
+        }
+
+        updateCourierLocation(courier, stationLocationId, now);
+        DeliveryRoute refreshed = refreshRoute(courier, now);
+        CampusLocation location = requireActiveLocation(stationLocationId);
+        return new CourierBatchPickupVO(stationLocationId, location.getLocationName(),
+                pickedOrderIds.size(), List.copyOf(pickedOrderIds), List.copyOf(pickedOrderNos),
+                buildRoute(courier, refreshed));
+    }
+
+    private List<Long> normalizeOrderIds(List<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            throw new BusinessException(ErrorCodes.DELIVERY_CONFLICT,
+                    "至少选择一个待取件订单", HttpStatus.BAD_REQUEST);
+        }
+        Set<Long> unique = new LinkedHashSet<>();
+        for (Long orderId : orderIds) {
+            if (orderId == null || orderId <= 0) {
+                throw new BusinessException(ErrorCodes.DELIVERY_CONFLICT,
+                        "配送订单编号必须为正数", HttpStatus.BAD_REQUEST);
+            }
+            unique.add(orderId);
+        }
+        return List.copyOf(unique);
+    }
+
+    private List<RouteStop> loadActionablePendingStops(Courier courier, LocalDateTime now) {
+        DeliveryRoute route = routeMapper.selectActiveByCourierIdForUpdate(courier.getId());
+        List<RouteStop> pending = route == null
+                ? List.of() : stopMapper.selectPendingByRouteIdForUpdate(route.getId());
+        if (pending.isEmpty()) {
+            route = refreshRoute(courier, now);
+            if ("COMPLETED".equals(route.getStatus())) {
+                throw routeConflict("当前路线中没有可执行节点");
+            }
+            routeMapper.selectActiveByCourierIdForUpdate(courier.getId());
+            pending = stopMapper.selectPendingByRouteIdForUpdate(route.getId());
+        }
+        if (pending.isEmpty()) {
+            throw routeConflict("当前路线中没有可执行节点");
+        }
+        return pending;
     }
 
     /** 阶段5只确认到达；入柜、取件码和COMPLETED由阶段6的入柜事务完成。 */
@@ -203,12 +300,84 @@ public class CourierExecutionService {
                 .filter(stop -> stopType.equals(stop.getStopType()))
                 .findFirst()
                 .orElseThrow(() -> routeConflict("当前路线不包含该订单的待执行节点"));
+        if (!Objects.equals(target.getLocationId(), expectedLocationId)) {
+            throw routeConflict("该订单的待执行地点与路线不一致");
+        }
         Long firstLocationId = pending.get(0).getLocationId();
-        if (!Objects.equals(firstLocationId, expectedLocationId)
-                || !Objects.equals(target.getLocationId(), expectedLocationId)) {
-            throw routeConflict("请按当前路线顺序完成下一地点的任务");
+        if (!Objects.equals(firstLocationId, expectedLocationId)) {
+            throw routeConflict(outOfOrderMessage(pending.get(0)));
         }
         return target;
+    }
+
+    /** 人在快递站即可取该站待取件，不必先完成路线中更靠前的送达。 */
+    private RouteStop requirePickupStop(Courier courier, DeliveryOrder order, LocalDateTime now) {
+        Long pickupLocationId = order.getPickupLocationId();
+        if (pickupLocationId == null) {
+            throw routeConflict("配送订单缺少取件服务站");
+        }
+        List<RouteStop> pending = loadActionablePendingStops(courier, now);
+        RouteStop target = pending.stream()
+                .filter(stop -> Objects.equals(stop.getDeliveryOrderId(), order.getId()))
+                .filter(stop -> "PICKUP".equals(stop.getStopType()))
+                .findFirst()
+                .orElseThrow(() -> routeConflict("当前路线不包含该订单的待取件节点"));
+        if (!Objects.equals(target.getLocationId(), pickupLocationId)) {
+            throw routeConflict("该订单的取件地点与路线不一致");
+        }
+        if (!canPickupAtStation(courier, pending, pickupLocationId)) {
+            CampusLocation station = locationMapper.selectById(pickupLocationId);
+            String stationName = station == null ? "目标快递站" : station.getLocationName();
+            throw routeConflict("请先到达「" + stationName + "」再确认取件");
+        }
+        return target;
+    }
+
+    private Long resolvePickupStationId(Courier courier, List<RouteStop> pending,
+                                        List<Long> requestedIds) {
+        if (courier.getCurrentLocationId() != null
+                && !collectPendingPickupsAt(pending, courier.getCurrentLocationId()).isEmpty()) {
+            return courier.getCurrentLocationId();
+        }
+        Long requestedStation = null;
+        for (RouteStop stop : pending) {
+            if ("PICKUP".equals(stop.getStopType()) && requestedIds.contains(stop.getDeliveryOrderId())) {
+                requestedStation = stop.getLocationId();
+                break;
+            }
+        }
+        if (requestedStation != null && canPickupAtStation(courier, pending, requestedStation)) {
+            return requestedStation;
+        }
+        throw routeConflict("当前位置没有待取件包裹，请先确认你已到达该快递站");
+    }
+
+    private boolean canPickupAtStation(Courier courier, List<RouteStop> pending, Long stationId) {
+        if (Objects.equals(courier.getCurrentLocationId(), stationId)) {
+            return true;
+        }
+        return !pending.isEmpty() && Objects.equals(pending.get(0).getLocationId(), stationId);
+    }
+
+    private Map<Long, RouteStop> collectPendingPickupsAt(List<RouteStop> pending, Long stationId) {
+        Map<Long, RouteStop> pickups = new LinkedHashMap<>();
+        for (RouteStop stop : pending) {
+            if ("PICKUP".equals(stop.getStopType())
+                    && Objects.equals(stop.getLocationId(), stationId)
+                    && stop.getDeliveryOrderId() != null) {
+                pickups.putIfAbsent(stop.getDeliveryOrderId(), stop);
+            }
+        }
+        return pickups;
+    }
+
+    private String outOfOrderMessage(RouteStop nextStop) {
+        CampusLocation next = locationMapper.selectById(nextStop.getLocationId());
+        String nextName = next == null ? "下一地点" : next.getLocationName();
+        if ("PICKUP".equals(nextStop.getStopType())) {
+            return "当前下一地点是「" + nextName + "」的取件任务，请先完成取件后再送达";
+        }
+        return "请先按路线到达「" + nextName + "」再确认送达";
     }
 
     private void completeStop(RouteStop stop, String status, LocalDateTime now) {
@@ -310,8 +479,10 @@ public class CourierExecutionService {
             DeliveryOrder order = orders.get(stop.getDeliveryOrderId());
             String orderNo = order == null ? "#" + stop.getDeliveryOrderId() : order.getOrderNo();
             if ("PICKUP".equals(stop.getStopType())) {
+                accumulator.pickupOrderIds.add(stop.getDeliveryOrderId());
                 accumulator.pickupOrderNos.add(orderNo);
             } else if ("DROPOFF".equals(stop.getStopType())) {
+                accumulator.dropoffOrderIds.add(stop.getDeliveryOrderId());
                 accumulator.dropoffOrderNos.add(orderNo);
             }
         }
@@ -397,7 +568,9 @@ public class CourierExecutionService {
         private final Long locationId;
         private final String locationName;
         private final LocalDateTime estimatedArrivalTime;
+        private final List<Long> pickupOrderIds = new ArrayList<>();
         private final List<String> pickupOrderNos = new ArrayList<>();
+        private final List<Long> dropoffOrderIds = new ArrayList<>();
         private final List<String> dropoffOrderNos = new ArrayList<>();
 
         private RouteStepAccumulator(int sequenceNo, Long locationId, String locationName,
@@ -410,7 +583,8 @@ public class CourierExecutionService {
 
         private CourierRouteStepVO toVo() {
             return new CourierRouteStepVO(sequenceNo, locationId, locationName,
-                    List.copyOf(pickupOrderNos), List.copyOf(dropoffOrderNos),
+                    List.copyOf(pickupOrderIds), List.copyOf(pickupOrderNos),
+                    List.copyOf(dropoffOrderIds), List.copyOf(dropoffOrderNos),
                     estimatedArrivalTime);
         }
     }

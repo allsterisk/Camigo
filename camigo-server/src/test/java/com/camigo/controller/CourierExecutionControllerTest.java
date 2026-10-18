@@ -13,6 +13,7 @@ import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.CourierExecutionService;
 import com.camigo.service.LockerService;
 import com.camigo.vo.CampusLocationOptionVO;
+import com.camigo.vo.CourierBatchPickupVO;
 import com.camigo.vo.CourierExecutionVO;
 import com.camigo.vo.CourierLocationStateVO;
 import com.camigo.vo.CourierRouteVO;
@@ -78,6 +79,10 @@ class CourierExecutionControllerTest {
         when(executionService.confirmPickup(8L, 5L)).thenReturn(new CourierExecutionVO(
                 5L, "DO001", "IN_TRANSIT", "DELIVERING", 25L,
                 "食堂北快递服务站", route));
+        when(executionService.confirmPickupBatch(8L, List.of(5L, 6L))).thenReturn(
+                new CourierBatchPickupVO(
+                        25L, "食堂北快递服务站", 2, List.of(5L, 6L),
+                        List.of("DO001", "DO002"), route));
         when(executionService.confirmArrival(8L, 5L)).thenReturn(new CourierExecutionVO(
                 5L, "DO001", "ARRIVED", "DELIVERING", 31L, "1号楼", route));
 
@@ -89,12 +94,20 @@ class CourierExecutionControllerTest {
                         .requestAttr(LoginInterceptor.CURRENT_USER_ID, 8L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderStatus").value("IN_TRANSIT"));
+        mockMvc.perform(post("/api/courier-execution/pickup-batch")
+                        .requestAttr(LoginInterceptor.CURRENT_USER_ID, 8L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderIds\":[5,6]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pickedCount").value(2))
+                .andExpect(jsonPath("$.data.orderIds[1]").value(6));
         mockMvc.perform(post("/api/courier-execution/orders/5/arrival")
                         .requestAttr(LoginInterceptor.CURRENT_USER_ID, 8L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderStatus").value("ARRIVED"));
 
         verify(executionService).confirmPickup(8L, 5L);
+        verify(executionService).confirmPickupBatch(8L, List.of(5L, 6L));
         verify(executionService).confirmArrival(8L, 5L);
     }
 

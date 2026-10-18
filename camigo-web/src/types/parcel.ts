@@ -13,6 +13,7 @@ export interface Parcel {
   destinationLocationId: number
   targetLockerId: number
   targetLockerName: string | null
+  targetLockerAddress: string | null
   sizeClass: string
   weightKg: number | null
   currentStatus: ParcelStatus | string

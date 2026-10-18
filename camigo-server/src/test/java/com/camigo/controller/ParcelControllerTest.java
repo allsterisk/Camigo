@@ -70,7 +70,8 @@ class ParcelControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.targetLockerId").value(3))
                 .andExpect(jsonPath("$.data.recipientName").value("张三"))
-                .andExpect(jsonPath("$.data.targetLockerName").value("1号楼智能柜"));
+                .andExpect(jsonPath("$.data.targetLockerName").value("1号楼智能柜"))
+                .andExpect(jsonPath("$.data.targetLockerAddress").value("一号宿舍楼东侧"));
     }
 
     @Test
@@ -113,7 +114,7 @@ class ParcelControllerTest {
 
     private ParcelVO parcel() {
         return new ParcelVO(10L, "SF202608030001", "SF", 7L, "张三", "李四", null,
-                9L, 3L, "1号楼智能柜", "M", new BigDecimal("1.25"), "ARRIVED",
-                false, null, null, null);
+                9L, 3L, "1号楼智能柜", "一号宿舍楼东侧", "M", new BigDecimal("1.25"),
+                "ARRIVED", false, null, null, null);
     }
 }

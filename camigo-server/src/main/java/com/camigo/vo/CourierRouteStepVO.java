@@ -8,7 +8,9 @@ public record CourierRouteStepVO(
         int sequenceNo,
         Long locationId,
         String locationName,
+        List<Long> pickupOrderIds,
         List<String> pickupOrderNos,
+        List<Long> dropoffOrderIds,
         List<String> dropoffOrderNos,
         LocalDateTime estimatedArrivalTime) {
 }

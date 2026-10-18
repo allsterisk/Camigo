@@ -68,6 +68,7 @@ export const useUserStore = defineStore('user', () => {
     role.value = null
     userInfo.value = null
     locationConfirmed.value = true
+    sessionStorage.removeItem(SESSION_KEY)
     localStorage.removeItem(SESSION_KEY)
   }
 
@@ -79,7 +80,7 @@ export const useUserStore = defineStore('user', () => {
       userInfo: userInfo.value,
       locationConfirmed: locationConfirmed.value,
     }
-    localStorage.setItem(SESSION_KEY, JSON.stringify(value))
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(value))
   }
 
   return {
@@ -98,7 +99,10 @@ export const useUserStore = defineStore('user', () => {
 })
 
 function readSession(): PersistedSession | null {
-  const raw = localStorage.getItem(SESSION_KEY)
+  // 旧版使用 localStorage，导致同源标签页互相覆盖账号；升级后不迁移旧会话，
+  // 以免把最后一次登录的共享账号复制进当前标签页。
+  localStorage.removeItem(SESSION_KEY)
+  const raw = sessionStorage.getItem(SESSION_KEY)
   if (!raw) return null
 
   try {
@@ -118,7 +122,7 @@ function readSession(): PersistedSession | null {
       locationConfirmed: value.role !== 'COURIER' || value.locationConfirmed === true,
     }
   } catch {
-    localStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
     return null
   }
 }

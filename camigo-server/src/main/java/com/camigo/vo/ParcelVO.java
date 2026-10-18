@@ -19,6 +19,7 @@ public record ParcelVO(
         @Schema(description = "目标校园位置编号") Long destinationLocationId,
         @Schema(description = "目标快递柜编号") Long targetLockerId,
         @Schema(description = "目标智能柜名称", nullable = true) String targetLockerName,
+        @Schema(description = "目标智能柜所在位置详细地址", nullable = true) String targetLockerAddress,
         @Schema(description = "包裹尺寸") String sizeClass,
         @Schema(description = "包裹重量（千克）", nullable = true) BigDecimal weightKg,
         @Schema(description = "公共快递状态") String currentStatus,

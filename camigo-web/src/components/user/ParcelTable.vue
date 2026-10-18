@@ -28,6 +28,9 @@ defineEmits<{ view: [id: number] }>()
     <el-table-column label="取件方式" min-width="120">
       <template #default>快递柜取件</template>
     </el-table-column>
+    <el-table-column label="取件地点" min-width="150">
+      <template #default="scope">{{ scope.row.targetLockerName || '—' }}</template>
+    </el-table-column>
     <el-table-column label="操作" width="90" fixed="right">
       <template #default="scope"><el-button link type="primary" @click="$emit('view', scope.row.id)">详情</el-button></template>
     </el-table-column>

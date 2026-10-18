@@ -81,6 +81,7 @@ class ParcelServiceImplTest {
         CampusLocation location = new CampusLocation();
         location.setId(9L);
         location.setStatus("ACTIVE");
+        location.setAddressDetail("一号宿舍楼东侧");
         when(locationMapper.selectById(9L)).thenReturn(location);
         when(parcelMapper.insert(any(ParcelEntity.class))).thenAnswer(invocation -> {
             ParcelEntity parcel = invocation.getArgument(0);
@@ -97,6 +98,7 @@ class ParcelServiceImplTest {
         assertThat(result.recipientName()).isEqualTo("张三");
         assertThat(result.targetLockerId()).isEqualTo(3L);
         assertThat(result.targetLockerName()).isEqualTo("1号楼智能柜");
+        assertThat(result.targetLockerAddress()).isEqualTo("一号宿舍楼东侧");
         assertThat(result.currentStatus()).isEqualTo("ARRIVED");
         verify(lifecycleService).recordInitialStatus(any(ParcelEntity.class), eq(1L), eq("ADMIN"));
     }

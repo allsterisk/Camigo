@@ -41,6 +41,7 @@ public class RouteInsertionPlanner {
                 .totalDistanceMeters();
         List<RouteStopTask> best = null;
         int bestDistance = Integer.MAX_VALUE;
+        int bestClusterScore = -1;
         int bestPickupIndex = Integer.MAX_VALUE;
         int bestDropoffIndex = Integer.MAX_VALUE;
 
@@ -53,12 +54,16 @@ public class RouteInsertionPlanner {
                 candidate.add(dropoffIndex, dropoff);
                 int candidateDistance = estimator.estimate(currentLocationId, candidate, calculatedAt)
                         .totalDistanceMeters();
+                int clusterScore = samePickupClusterScore(candidate, pickup);
                 if (candidateDistance < bestDistance
+                        || (candidateDistance == bestDistance && clusterScore > bestClusterScore)
                         || (candidateDistance == bestDistance
+                        && clusterScore == bestClusterScore
                         && (pickupIndex < bestPickupIndex
                         || (pickupIndex == bestPickupIndex && dropoffIndex < bestDropoffIndex)))) {
                     best = candidate;
                     bestDistance = candidateDistance;
+                    bestClusterScore = clusterScore;
                     bestPickupIndex = pickupIndex;
                     bestDropoffIndex = dropoffIndex;
                 }
@@ -73,7 +78,8 @@ public class RouteInsertionPlanner {
 
     public RoutePlan recalculate(long currentLocationId, List<RouteStopTask> unfinishedTasks,
                                  LocalDateTime calculatedAt) {
-        List<RouteStopTask> tasks = List.copyOf(unfinishedTasks);
+        List<RouteStopTask> tasks = promoteCurrentStationPickups(currentLocationId,
+                List.copyOf(unfinishedTasks));
         validateExistingOrder(tasks);
         if (tasks.size() > properties.maxActiveOrders() * 2) {
             throw new IllegalArgumentException("未完成取送节点超过配送员容量");
@@ -82,6 +88,58 @@ public class RouteInsertionPlanner {
                 currentLocationId, tasks, calculatedAt);
         return new RoutePlan(currentLocationId, schedule.stops(), schedule.totalDistanceMeters(),
                 schedule.estimatedDurationSeconds(), 0, properties.algorithmVersion(), calculatedAt);
+    }
+
+    /** 配送员已在某快递站时，将该站剩余取件提前到送达之前，便于一次取齐。 */
+    private List<RouteStopTask> promoteCurrentStationPickups(long currentLocationId,
+                                                             List<RouteStopTask> tasks) {
+        List<RouteStopTask> pickupsHere = new ArrayList<>();
+        List<RouteStopTask> rest = new ArrayList<>();
+        for (RouteStopTask task : tasks) {
+            if (task.stopType() == RouteStopType.PICKUP && task.locationId() == currentLocationId) {
+                pickupsHere.add(task);
+            } else {
+                rest.add(task);
+            }
+        }
+        if (pickupsHere.isEmpty()) {
+            return tasks;
+        }
+        List<RouteStopTask> promoted = new ArrayList<>(pickupsHere.size() + rest.size());
+        promoted.addAll(pickupsHere);
+        promoted.addAll(rest);
+        return promoted;
+    }
+
+    private int samePickupClusterScore(List<RouteStopTask> candidate, RouteStopTask pickup) {
+        int index = -1;
+        for (int i = 0; i < candidate.size(); i++) {
+            RouteStopTask task = candidate.get(i);
+            if (task.deliveryOrderId() == pickup.deliveryOrderId()
+                    && task.stopType() == RouteStopType.PICKUP) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) {
+            return 0;
+        }
+        int score = 0;
+        if (index > 0) {
+            RouteStopTask previous = candidate.get(index - 1);
+            if (previous.stopType() == RouteStopType.PICKUP
+                    && previous.locationId() == pickup.locationId()) {
+                score += 2;
+            }
+        }
+        if (index + 1 < candidate.size()) {
+            RouteStopTask next = candidate.get(index + 1);
+            if (next.stopType() == RouteStopType.PICKUP
+                    && next.locationId() == pickup.locationId()) {
+                score += 2;
+            }
+        }
+        return score;
     }
 
     private void validateNewPair(RouteStopTask pickup, RouteStopTask dropoff) {

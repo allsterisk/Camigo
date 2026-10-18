@@ -56,8 +56,8 @@ const statusDisplay = computed(() => getStatusDisplay(props.parcel.currentStatus
     <section class="parcel-detail__section parcel-detail__pickup">
       <div>
         <span class="parcel-detail__label">取件位置</span>
-        <h2>校园位置 #{{ parcel.destinationLocationId }}</h2>
-        <p>目标快递柜 #{{ parcel.targetLockerId }} · 请在收到取件通知后前往</p>
+        <h2>{{ parcel.targetLockerAddress || '详细地址待确认' }}</h2>
+        <p>{{ parcel.targetLockerName || '智能柜待确认' }} · 请在收到取件通知后前往</p>
       </div>
       <span class="parcel-detail__locker">柜</span>
     </section>

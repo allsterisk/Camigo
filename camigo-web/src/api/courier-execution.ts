@@ -1,5 +1,6 @@
 import type {
   CampusLocationOption,
+  CourierBatchPickupResult,
   CourierExecutionResult,
   CourierLocationState,
   CourierRoute,
@@ -35,6 +36,13 @@ export function confirmOrderPickup(orderId: number): Promise<CourierExecutionRes
   return post<CourierExecutionResult, undefined>(
     `/courier-execution/orders/${orderId}/pickup`,
     undefined,
+  )
+}
+
+export function confirmOrderPickupBatch(orderIds: number[]): Promise<CourierBatchPickupResult> {
+  return post<CourierBatchPickupResult, { orderIds: number[] }>(
+    '/courier-execution/pickup-batch',
+    { orderIds },
   )
 }
 

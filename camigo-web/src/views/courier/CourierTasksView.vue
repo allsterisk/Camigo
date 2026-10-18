@@ -17,6 +17,7 @@ import { useCourierExceptions } from '@/composables/useCourierExceptions'
 import { useCourierDispatchOffer } from '@/composables/useCourierDispatchOffer'
 import type { ParcelExceptionType } from '@/types/parcel-exception'
 import type { DispatchRejectReason } from '@/types/dispatch'
+import { stationPickupOrderIds } from '@/utils/courier-route'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,9 +33,11 @@ const {
   route: currentRoute,
   loading: routeLoading,
   actionOrderId,
+  actionBusy,
   errorMessage: routeError,
   load: loadRoute,
   confirmPickup,
+  confirmPickupBatch,
   confirmArrival,
 } = useCourierRoute()
 const {
@@ -59,8 +62,18 @@ const {
 } = useCourierDispatchOffer()
 
 const currentPage = computed(() => parsePage(route.query.page))
-const activeActionOrderId = computed(() => actionOrderId.value ?? storageOrderId.value
-  ?? (exceptionSubmitting.value ? exceptionOrderId.value : null))
+const activeActionOrderId = computed(() => {
+  if (actionBusy.value) return actionOrderId.value ?? -1
+  return actionOrderId.value ?? storageOrderId.value
+    ?? (exceptionSubmitting.value ? exceptionOrderId.value : null)
+})
+const stationPickupIds = computed(() => stationPickupOrderIds(currentRoute.value))
+const actionablePickupIds = computed(() => new Set(stationPickupIds.value))
+const actionableArrivalIds = computed(() => {
+  const step = currentRoute.value?.steps?.[0]
+  if (!step) return new Set<number>()
+  return new Set(step.dropoffOrderIds ?? [])
+})
 
 function parsePage(value: unknown): number {
   const raw = Array.isArray(value) ? value[0] : value
@@ -98,7 +111,7 @@ function setPage(page: number) {
 async function handlePickup(orderId: number) {
   try {
     await ElMessageBox.confirm(
-      '请确认你已在当前路线指定的服务站取到该包裹。',
+      '请确认你已在该快递站取到该包裹。',
       '确认取件',
       { type: 'warning', confirmButtonText: '已取到包裹', cancelButtonText: '取消' },
     )
@@ -108,6 +121,24 @@ async function handlePickup(orderId: number) {
   const result = await confirmPickup(orderId)
   if (!result) return
   ElMessage.success(`取件已确认，当前位置更新为${result.currentLocationName}`)
+  await load({ page: currentPage.value, pageSize: 10, status: 'PROCESSING' })
+}
+
+async function handleBatchPickup(orderIds: number[]) {
+  try {
+    await ElMessageBox.confirm(
+      `请确认你已在当前服务站一次性取到这 ${orderIds.length} 件包裹。系统将批量确认取件并刷新剩余配送路线。`,
+      '本站全部取件',
+      { type: 'warning', confirmButtonText: '已全部取到', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  const result = await confirmPickupBatch(orderIds)
+  if (!result) return
+  ElMessage.success(
+    `已在${result.pickupLocationName}确认取件 ${result.pickedCount} 件，剩余路线已更新`,
+  )
   await load({ page: currentPage.value, pageSize: 10, status: 'PROCESSING' })
 }
 
@@ -151,7 +182,7 @@ watch(currentPage, refresh, { immediate: true })
   <div>
     <PageHeader
       title="我的任务"
-      description="按动态路线完成取件、到达和入柜，格口只显示当前兼容选项。"
+      description="同站多件可一次取齐；取件、到达后路线会从新位置自动刷新。"
       refreshable
       :refreshing="loading"
       @refresh="refresh"
@@ -171,7 +202,10 @@ watch(currentPage, refresh, { immediate: true })
       :route="currentRoute"
       :loading="routeLoading"
       :error-message="routeError"
+      :batch-acting="actionBusy"
+      :station-pickup-ids="stationPickupIds"
       @refresh="loadRoute"
+      @batch-pickup="handleBatchPickup"
     />
     <el-alert
       v-if="errorMessage"
@@ -185,7 +219,7 @@ watch(currentPage, refresh, { immediate: true })
       <div class="courier-tasks__section-heading">
         <div>
           <h2 id="active-task-title">执行中任务</h2>
-          <p>接受派单后，任务会按当前动态路线显示在这里。</p>
+          <p>人在快递站即可取该站待取件；送达仍按路线下一站操作。同站多件可用「本站全部取件」。</p>
         </div>
         <span>{{ total }} 项</span>
       </div>
@@ -201,6 +235,8 @@ watch(currentPage, refresh, { immediate: true })
           :tasks="tasks"
           :loading="loading"
           :action-order-id="activeActionOrderId"
+          :actionable-pickup-ids="actionablePickupIds"
+          :actionable-arrival-ids="actionableArrivalIds"
           show-actions
           @pickup="handlePickup"
           @arrival="handleArrival"

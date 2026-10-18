@@ -17,7 +17,9 @@ export interface CourierRouteStep {
   sequenceNo: number
   locationId: number
   locationName: string
+  pickupOrderIds?: number[]
   pickupOrderNos: string[]
+  dropoffOrderIds?: number[]
   dropoffOrderNos: string[]
   estimatedArrivalTime: string | null
 }
@@ -40,5 +42,14 @@ export interface CourierExecutionResult {
   parcelStatus: string
   currentLocationId: number
   currentLocationName: string
+  route: CourierRoute
+}
+
+export interface CourierBatchPickupResult {
+  pickupLocationId: number
+  pickupLocationName: string
+  pickedCount: number
+  orderIds: number[]
+  orderNos: string[]
   route: CourierRoute
 }

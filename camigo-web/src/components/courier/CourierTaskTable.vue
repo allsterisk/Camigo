@@ -11,12 +11,18 @@ const props = withDefaults(defineProps<{
   /** 是否在操作列展示「查看评价」入口（配送记录页使用） */
   showEvaluation?: boolean
   timeColumnLabel?: string
+  /** 当前所在（或正前往）快递站可取件的订单；未传入时不限制 */
+  actionablePickupIds?: ReadonlySet<number> | null
+  /** 当前路线下一站可确认到达的订单；未传入时不限制 */
+  actionableArrivalIds?: ReadonlySet<number> | null
 }>(), {
   loading: false,
   actionOrderId: null,
   showActions: false,
   showEvaluation: false,
   timeColumnLabel: '任务时间',
+  actionablePickupIds: null,
+  actionableArrivalIds: null,
 })
 
 defineEmits<{
@@ -39,6 +45,26 @@ function executionLabel(status: string): string {
     FAILED: '配送失败',
     CANCELLED: '已取消',
   } as Record<string, string>)[status] ?? status
+}
+
+function canPickup(orderId: number): boolean {
+  if (props.actionablePickupIds == null) return true
+  return props.actionablePickupIds.has(orderId)
+}
+
+function canArrive(orderId: number): boolean {
+  if (props.actionableArrivalIds == null) return true
+  return props.actionableArrivalIds.has(orderId)
+}
+
+function pickupDisabled(orderId: number): boolean {
+  if (props.actionOrderId !== null && props.actionOrderId !== orderId) return true
+  return !canPickup(orderId)
+}
+
+function arrivalDisabled(orderId: number): boolean {
+  if (props.actionOrderId !== null && props.actionOrderId !== orderId) return true
+  return !canArrive(orderId)
 }
 </script>
 
@@ -66,21 +92,23 @@ function executionLabel(status: string): string {
         {{ formatDateTime(row.completedTime || row.acceptedTime || row.createTime) }}
       </template>
     </el-table-column>
-    <el-table-column v-if="showActions" label="操作" fixed="right" min-width="120">
+    <el-table-column v-if="showActions" label="操作" fixed="right" min-width="140">
       <template #default="{ row }">
         <div class="courier-task-table__actions">
         <el-button
           v-if="['ACCEPTED', 'PICKING_UP'].includes(row.executionStatus)"
           type="primary"
           :loading="actionOrderId === row.id"
-          :disabled="actionOrderId !== null && actionOrderId !== row.id"
+          :disabled="pickupDisabled(row.id)"
+          :title="canPickup(row.id) ? undefined : '请先到达该订单的取件站再确认取件'"
           @click="$emit('pickup', row.id)"
         >确认取件</el-button>
         <el-button
           v-else-if="row.executionStatus === 'IN_TRANSIT'"
           type="success"
           :loading="actionOrderId === row.id"
-          :disabled="actionOrderId !== null && actionOrderId !== row.id"
+          :disabled="arrivalDisabled(row.id)"
+          :title="canArrive(row.id) ? undefined : '请先按当前路线完成前面的取送节点'"
           @click="$emit('arrival', row.id)"
         >确认到达</el-button>
         <el-button

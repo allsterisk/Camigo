@@ -4,18 +4,32 @@ import { ArrowDownBold, RefreshRight } from '@element-plus/icons-vue'
 import type { CourierRoute } from '@/types/courier-execution'
 import { formatDateTime } from '@/utils/parcel'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   route: Readonly<CourierRoute> | null
   loading: boolean
   errorMessage?: string
-}>()
+  batchActing?: boolean
+  stationPickupIds?: readonly number[]
+}>(), {
+  errorMessage: '',
+  batchActing: false,
+  stationPickupIds: () => [],
+})
 
-defineEmits<{ refresh: [] }>()
+const emit = defineEmits<{
+  refresh: []
+  batchPickup: [orderIds: number[]]
+}>()
 
 function formatDuration(seconds: number): string {
   if (seconds <= 0) return '暂无行程'
   const minutes = Math.ceil(seconds / 60)
   return minutes < 60 ? `约 ${minutes} 分钟` : `约 ${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`
+}
+
+function isStationPickupStep(step: { pickupOrderIds?: number[] }): boolean {
+  const ids = step.pickupOrderIds ?? []
+  return ids.some((id) => props.stationPickupIds.includes(id))
 }
 </script>
 
@@ -24,9 +38,9 @@ function formatDuration(seconds: number): string {
     <header class="route-panel__header">
       <div>
         <h2 id="route-panel-title">当前配送路线</h2>
-        <p>完成取件或到达节点后，路线会从新位置自动刷新。</p>
+        <p>人在快递站即可取该站待取件；同站多件可一次取齐，送达仍按路线顺序。</p>
       </div>
-      <el-button :icon="RefreshRight" :loading="loading" plain @click="$emit('refresh')">
+      <el-button :icon="RefreshRight" :loading="loading" plain @click="emit('refresh')">
         刷新路线
       </el-button>
     </header>
@@ -77,6 +91,17 @@ function formatDuration(seconds: number): string {
                 </div>
                 <p v-if="step.pickupOrderNos.length">取件：{{ step.pickupOrderNos.join('、') }}</p>
                 <p v-if="step.dropoffOrderNos.length">送达：{{ step.dropoffOrderNos.join('、') }}</p>
+                <el-button
+                  v-if="isStationPickupStep(step) && stationPickupIds.length > 1"
+                  class="route-panel__batch"
+                  type="primary"
+                  size="small"
+                  :loading="batchActing"
+                  :disabled="batchActing"
+                  @click="emit('batchPickup', [...stationPickupIds])"
+                >
+                  本站全部取件（{{ stationPickupIds.length }}）
+                </el-button>
               </div>
             </article>
           </div>
@@ -117,6 +142,7 @@ function formatDuration(seconds: number): string {
 .route-panel__step-title strong { color: #244f4b; font-size: 14px; }
 .route-panel__step-title time { flex: 0 0 auto; color: #78918d; font-size: 10px; }
 .route-panel__step p { margin: 7px 0 0; color: #577672; font-size: 12px; line-height: 1.5; }
+.route-panel__batch { margin-top: 12px; }
 .route-panel__empty { padding: 42px 20px; color: #77908c; text-align: center; }
 .route-panel__empty strong { display: block; color: #456a65; font-size: 14px; }
 .route-panel__empty p { max-width: 34ch; margin: 8px auto 0; font-size: 12px; line-height: 1.6; }

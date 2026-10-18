@@ -2,10 +2,12 @@ package com.camigo.controller;
 
 import com.camigo.annotation.RequireRoles;
 import com.camigo.common.Result;
+import com.camigo.dto.CourierPickupBatchDTO;
 import com.camigo.dto.CourierStorageDTO;
 import com.camigo.interceptor.LoginInterceptor;
 import com.camigo.service.CourierExecutionService;
 import com.camigo.service.LockerService;
+import com.camigo.vo.CourierBatchPickupVO;
 import com.camigo.vo.CourierExecutionVO;
 import com.camigo.vo.CourierStorageVO;
 import com.camigo.vo.CourierRouteVO;
@@ -54,6 +56,14 @@ public class CourierExecutionController {
             @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
             @PathVariable @Positive(message = "配送订单编号必须为正数") Long orderId) {
         return Result.success(executionService.confirmPickup(userId, orderId));
+    }
+
+    @Operation(summary = "在同一服务站批量确认取件")
+    @PostMapping("/pickup-batch")
+    public Result<CourierBatchPickupVO> confirmPickupBatch(
+            @RequestAttribute(LoginInterceptor.CURRENT_USER_ID) Long userId,
+            @Valid @RequestBody CourierPickupBatchDTO request) {
+        return Result.success(executionService.confirmPickupBatch(userId, request.orderIds()));
     }
 
     @Operation(summary = "在配送目的地确认到达")

@@ -2,6 +2,7 @@ package com.camigo.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.camigo.config.RoutingProperties;
 import java.time.LocalDateTime;
@@ -68,6 +69,29 @@ class RouteInsertionPlannerTest {
         assertThat(result.stops()).hasSize(16);
         assertThat(result.orderedTasks().indexOf(pickup))
                 .isLessThan(result.orderedTasks().indexOf(dropoff));
+    }
+
+    @Test
+    void shouldClusterSameStationPickupsWhenDistanceIsEqual() {
+        List<RouteStopTask> existing = List.of(
+                new RouteStopTask(1, 5, RouteStopType.PICKUP),
+                new RouteStopTask(1, 9, RouteStopType.DROPOFF));
+        RouteStopTask pickup = new RouteStopTask(2, 5, RouteStopType.PICKUP);
+        RouteStopTask dropoff = new RouteStopTask(2, 7, RouteStopType.DROPOFF);
+
+        RoutePlan result = planner.insert(1, existing, pickup, dropoff,
+                LocalDateTime.of(2026, 8, 31, 9, 0));
+
+        assertThat(result.orderedTasks().subList(0, 2))
+                .extracting(RouteStopTask::locationId, RouteStopTask::stopType)
+                .containsExactly(
+                        tuple(5L, RouteStopType.PICKUP),
+                        tuple(5L, RouteStopType.PICKUP));
+        assertThat(result.orderedTasks()).contains(pickup, dropoff, existing.get(0), existing.get(1));
+        assertThat(result.orderedTasks().indexOf(pickup))
+                .isLessThan(result.orderedTasks().indexOf(dropoff));
+        assertThat(result.orderedTasks().indexOf(existing.get(0)))
+                .isLessThan(result.orderedTasks().indexOf(existing.get(1)));
     }
 
     @Test
